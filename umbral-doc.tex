@@ -1,7 +1,9 @@
 
 \documentclass[12pt]{article}
+\usepackage{amssymb}
 \usepackage{geometry} % see geometry.pdf on how to lay out the page. There's lots.
 \geometry{a4paper} % or letter or a5paper or ... etc
+\usepackage[utf8]{inputenc}
 % \geometry{landscape} % rotated page geometry
 
 % See the ``Article customise'' template for come common customisations
@@ -11,12 +13,81 @@
 \date{} % delete this line to display the current date
 
 %%% BEGIN DOCUMENT
+
+
+
 \begin{document}
 
 \maketitle
-\tableofcontents
 
-\section{}
-\subsection{}
+\begin{abstract}
+This document describes the Umbral proxy re-encryption scheme used by NuCypher KMS. 
+Umbral is a threshold proxy re-encryption scheme based on ECIES-KEM \cite{ecies-iso} and BBS98 \cite{blaze1998divertible}. 
+
+%The name ``Umbral'' comes from the Spanish word for ``threshold''. 
+%Umbral ciphertexts have the same form than ECIES-KEM ciphertexts
+
+\end{abstract}
+
+%\tableofcontents
+
+
+\section{Introduction}
+
+\section{Preliminaries}
+
+\subsection{Notation}
+
+\subsection{Proxy Re-Encryption}
+
+(TODO: General description of proxy re-encryption, properties, etc)
+
+\subsection{ECIES}
+
+The Asymmetric Encryption Scheme defined in standard ANSI X9.63 \cite{ansi-x9.63}, also known as Elliptic Curve Integrated Encryption Scheme (ECIES), is a hybrid encryption algorithm based on elliptic curve cryptography, symmetric encryption and message authentication codes. 
+This algorithm is of public knowledge, and variants have been standardized also by ISO/IEC 18033-2 \cite{iso-18033-2} and IEEE P1363A \cite{ieee-p1363a}.  
+When producing a ciphertext with ECIES, the sender first creates an ephemeral public key and uses it for a Diffie-Hellman key agreement together with the public key of the intended recipient. The resulting shared secret is used to create the keys for the symmetric encryption and message authentication code algorithms used internally. The final ciphertext consists of the ephemeral public key, as it is necessary for decryption, and the output of the symmetric encryption and message authentication code.
+
+A Sender can  be any entity that generates data and wants to send it confidentially to a receiver, in the form of a ciphertext encrypted under the public key of the receiver. 
+
+A Receiver can be any entity that is entitled to read ciphertexts encrypted under his public key. We distinguish two types of receivers. The original receiver, which is the recipient of the data originally intended by the sender, and the delegated receiver, whom the original receiver entrusts to be able to decrypt ciphertexts initially intended to him. Therefore, there is a relation of delegation between the original receiver and the delegated one. 
+
+The Intermediary is an entity that controls the process of switching the public key of ciphertexts, from the public key of the original receiver to the public key of a delegated receiver, without being able to learn anything from the data. The Intermediary needs a key-switching key between the original and delegated receivers in order to be able to perform the key-switching process.
+
+ECIES can be used in a variety of elliptic curves, but we will restrict the choice of elliptic curves in our cryptosystem to those that generate a group of prime order. %ECIES define procedures for encryption and decryption, as well as defines 
+
+\section{The Umbral PRE cryptosystem}
+
+In this section we present the Umbral PRE cryptosystem, defined by the following algorithms:
+
+\begin{itemize}
+	%\item $\mathsf{Setup}(1^k)\rightarrow params$. On input the security parameter $1^k$, the global setup algorithm $\mathsf{Setup}$ outputs the global parameters $params$.
+	\item $\mathsf{KeyGen}()$: Sample $x \in \mathbb Z_q$, compute $g^x$ and output the keypair $(pk, sk) = (g^x, x)$.
+%	\item $\mathsf{ReKeyGen}(\sk{A}, \sk{B})$: On input the secret keys $\sk{A} = f_A$ and $\sk{B} = f_B$, the re-encryption key generation algorithm $\mathsf{ReKeyGen}$ computes the re-encryption key between users $A$ and $B$ as $\rk{A}{B} = \sk{A} \cdot \sk{B}^{-1} = f_A \cdot \invfB $.
+	
+	\item $\mathsf{Enc}(pk_A, M)$: On input the public key $pk_A$ and a message $M\in\mathcal{M}$, the encryption algorithm $\mathsf{Enc}$ first computes $(K, epk) = \mathsf{Encapsulate}(pk_A)$, 
+	$C_0$ is the byte encoding of the point $epk$. $C_1$ is the ciphertext that results of applying an authenticated encryption algorithm to $M$ with the key $K$. 
+	Finally, it outputs the ciphertext $C = C_0||C_1$.
+	
+		\item $\mathsf{Dec}(sk_A, C)$: On input the secret key $sk_A$ and a ciphertext $C$, the decryption algorithm $\mathsf{Dec}$ first parses $C$ as $C_0||C_1$, and decodes $epk$ from its byte representation $C_0$. Next, it computes the key $K = \mathsf{Decapsulate}(sk_A, epk)$, and decrypts ciphertext $C_1$ using the AE decryption function to obtain message $M$ if decryption is correct, and $\perp$ otherwise. Finally, it outputs message $M$ (or $\perp$ if decryption was invalid).
+%	
+%	\item $\mathsf{ReEnc}(\rk{A}{B}, C_A)$: On input a re-encryption key \linebreak
+%	$\rk{A}{B}$ and a ciphertext $C_A$, the re-encryption algorithm $\mathsf{ReEnc}$ samples noise polynomial $e'$ from a distribution from $\Psi_{\alpha}$ and outputs ciphertext $C_B = C_A \cdot \rk{A}{B} + pe' \in \Rq$.
+%	\item $\mathsf{Dec}(\sk{A}, C_A)$. On input the secret key $\sk{A} = f_A$ and a ciphertext $C_A$, the decryption algorithm $\mathsf{Dec}$ computes $C'_A = C_A \cdot f_A$ and outputs the message $M = (C'_A \mod p) \in \mathcal M$.
+\end{itemize}
+
+\textbf{Key Encapsulation Auxiliary Functions}
+\begin{itemize}
+	\item $\mathsf{Encapsulate}(pk_A)$: On input the public key $pk_A$, %and a message $M\in\mathcal{M}$, 
+	the encapsulation algorithm $\mathsf{Encapsulate}$ first generates an ephemeral keypair $(epk, esk) = (g^r, r)$, performs a Diffie-Hellman key agreement between $pk_A$ and $esk$ to compute a shared secret $S_A$, and uses this shared secret as input to a KDF to produce the encapsulation key $K$. Finally, it outputs $(K, epk)$.
+	\item $\mathsf{Decapsulate}(sk_A, epk)$: On input the secret key $pk_A$, %and a message $M\in\mathcal{M}$, 
+	the decapsulation algorithm $\mathsf{Decapsulate}$ first performs a Diffie-Hellman key agreement between $epk$ and $sk_A$ to compute a shared secret $S_A$, and uses this shared secret as input to a KDF to produce the encapsulation key $K$. Finally, it outputs $K$.
+\end{itemize}
+
+\subsection{Parameters of Umbral instantiation in NuCypher KMS}
+
+%secp256k1 curve
+% AE scheme: NaCL SecretBox (ChaCha20-Poly1305)
+
 
 \end{document}
