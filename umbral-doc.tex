@@ -4,9 +4,7 @@
 \usepackage{geometry} % see geometry.pdf on how to lay out the page. There's lots.
 \geometry{a4paper} % or letter or a5paper or ... etc
 \usepackage[utf8]{inputenc}
-% \geometry{landscape} % rotated page geometry
-
-% See the ``Article customise'' template for come common customisations
+\usepackage{url}
 
 \title{Umbral: a threshold proxy re-encryption scheme}
 \author{David Núñez}
@@ -22,7 +20,7 @@
 
 \begin{abstract}
 This document describes the Umbral proxy re-encryption scheme used by NuCypher KMS. 
-Umbral is a threshold proxy re-encryption scheme based on ECIES-KEM \cite{ecies-iso} and BBS98 \cite{blaze1998divertible}. 
+Umbral is a threshold proxy re-encryption scheme based on ECIES-KEM \cite{ansi-x9.63} and BBS98 \cite{blaze1998divertible}. 
 
 %The name ``Umbral'' comes from the Spanish word for ``threshold''. 
 %Umbral ciphertexts have the same form than ECIES-KEM ciphertexts
@@ -45,7 +43,8 @@ Umbral is a threshold proxy re-encryption scheme based on ECIES-KEM \cite{ecies-
 \subsection{ECIES}
 
 The Asymmetric Encryption Scheme defined in standard ANSI X9.63 \cite{ansi-x9.63}, also known as Elliptic Curve Integrated Encryption Scheme (ECIES), is a hybrid encryption algorithm based on elliptic curve cryptography, symmetric encryption and message authentication codes. 
-This algorithm is of public knowledge, and variants have been standardized also by ISO/IEC 18033-2 \cite{iso-18033-2} and IEEE P1363A \cite{ieee-p1363a}.  
+This algorithm is of public knowledge, and variants have been standardized also by ISO/IEC 18033-2 \cite{iso-18033-2} and IEEE P1363A \cite{ieee-p1363a}. A brief comparison of the different variants of ECIES can be found in \cite{martinez2010comparison}. 
+
 When producing a ciphertext with ECIES, the sender first creates an ephemeral public key and uses it for a Diffie-Hellman key agreement together with the public key of the intended recipient. The resulting shared secret is used to create the keys for the symmetric encryption and message authentication code algorithms used internally. The final ciphertext consists of the ephemeral public key, as it is necessary for decryption, and the output of the symmetric encryption and message authentication code.
 
 A Sender can  be any entity that generates data and wants to send it confidentially to a receiver, in the form of a ciphertext encrypted under the public key of the receiver. 
@@ -89,5 +88,6 @@ In this section we present the Umbral PRE cryptosystem, defined by the following
 %secp256k1 curve
 % AE scheme: NaCL SecretBox (ChaCha20-Poly1305)
 
-
+\bibliographystyle{abbrv}       % APS-like style for physics
+\bibliography{umbral-doc}
 \end{document}
