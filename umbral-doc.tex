@@ -1,5 +1,6 @@
 
 \documentclass[12pt]{article}
+\usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{geometry} % see geometry.pdf on how to lay out the page. There's lots.
 \geometry{a4paper} % or letter or a5paper or ... etc
@@ -36,6 +37,8 @@ Umbral is a threshold proxy re-encryption scheme based on ECIES-KEM \cite{ansi-x
 
 \subsection{Notation}
 
+Although the additive notation is the norm when dealing with elliptic curve cryptography, in this document we adopt the multiplicative notation to express the operations in the elliptic curve group, which is the usual approach in the proxy re-encryption literature (where schemes are defined in generic groups).
+
 \subsection{Proxy Re-Encryption}
 
 (TODO: General description of proxy re-encryption, properties, etc)
@@ -64,23 +67,32 @@ In this section we present the Umbral PRE cryptosystem, defined by the following
 	\item $\mathsf{KeyGen}()$: Sample $x \in \mathbb Z_q$, compute $g^x$ and output the keypair $(pk, sk) = (g^x, x)$.
 %	\item $\mathsf{ReKeyGen}(\sk{A}, \sk{B})$: On input the secret keys $\sk{A} = f_A$ and $\sk{B} = f_B$, the re-encryption key generation algorithm $\mathsf{ReKeyGen}$ computes the re-encryption key between users $A$ and $B$ as $\rk{A}{B} = \sk{A} \cdot \sk{B}^{-1} = f_A \cdot \invfB $.
 	
-	\item $\mathsf{Enc}(pk_A, M)$: On input the public key $pk_A$ and a message $M\in\mathcal{M}$, the encryption algorithm $\mathsf{Enc}$ first computes $(K, epk) = \mathsf{Encapsulate}(pk_A)$, 
-	$C_0$ is the byte encoding of the point $epk$. $C_1$ is the ciphertext that results of applying an authenticated encryption algorithm to $M$ with the key $K$. 
-	Finally, it outputs the ciphertext $C = C_0||C_1$.
+	\item $\mathsf{Enc}(pk_A, M)$: On input the public key $pk_A$ and a message $M\in\mathcal{M}$, the encryption algorithm $\mathsf{Enc}$ first computes $(K, encKey) = \mathsf{Encapsulate}(pk_A)$.  
+	%$EPK$ is the byte encoding of the point $epk$. 
+	$encData$ is the result of applying the authenticated encryption algorithm to $M$ with key $K$. 
+	Finally, it outputs the ciphertext $C = (encKey, encData)$.
 	
-		\item $\mathsf{Dec}(sk_A, C)$: On input the secret key $sk_A$ and a ciphertext $C$, the decryption algorithm $\mathsf{Dec}$ first parses $C$ as $C_0||C_1$, and decodes $epk$ from its byte representation $C_0$. Next, it computes the key $K = \mathsf{Decapsulate}(sk_A, epk)$, and decrypts ciphertext $C_1$ using the AE decryption function to obtain message $M$ if decryption is correct, and $\perp$ otherwise. Finally, it outputs message $M$ (or $\perp$ if decryption was invalid).
-%	
-%	\item $\mathsf{ReEnc}(\rk{A}{B}, C_A)$: On input a re-encryption key \linebreak
-%	$\rk{A}{B}$ and a ciphertext $C_A$, the re-encryption algorithm $\mathsf{ReEnc}$ samples noise polynomial $e'$ from a distribution from $\Psi_{\alpha}$ and outputs ciphertext $C_B = C_A \cdot \rk{A}{B} + pe' \in \Rq$.
-%	\item $\mathsf{Dec}(\sk{A}, C_A)$. On input the secret key $\sk{A} = f_A$ and a ciphertext $C_A$, the decryption algorithm $\mathsf{Dec}$ computes $C'_A = C_A \cdot f_A$ and outputs the message $M = (C'_A \mod p) \in \mathcal M$.
+		\item $\mathsf{Dec}(sk_A, C)$: On input the secret key $sk_A$ and a ciphertext $C = (encKey, encData)$, the decryption algorithm $\mathsf{Dec}$ %first parses $C$ as $EPK||AE$, and decodes $epk$ from its byte representation $EPK$. Next, it 
+		computes the key $K = \mathsf{Decapsulate}(sk_A, epk)$, and decrypts ciphertext $AE$ using the decryption function of the AE scheme to obtain message $M$ if decryption is correct, and $\perp$ otherwise. Finally, it outputs message $M$ (or $\perp$ if decryption was invalid).
+		
+		\item $\mathsf{DecFrag}(sk_A, \{F_i\}_{i=1}^t, AE)$: On input the secret key $sk_A$ and a set of $t$ fragments of an encapsulated key, each of them labeled as $F_i$, and the encrypted data $encData$, the fragments decryption algorithm $\mathsf{DecFrag}$ first computes $encKey' = \mathsf{Combine}(\{F_i\}_{i=1}^t)$. With this result, it returns the result of $\mathsf{Dec}(sk_A, C')$, where $C' = (encKey', encData)$. % is the byte representation of $epk'$.
+
+	
+	\item $\mathsf{ReEncFrag}(kFrag, encKey)$: On input a re-encryption key fragment $kFrag$, and an encapsulated key $encKey$, the fragmented re-encryption algorithm $\mathsf{ReEncFrag}$ first parses $kFrag = (rk, id)$, 
+	and computes $encKey' = (encKey)^{rk}$. Finally it outputs the encapsulated key fragment $F = (encKey', id)$. 
 \end{itemize}
 
-\textbf{Key Encapsulation Auxiliary Functions}
+\textbf{Auxiliary Functions}
 \begin{itemize}
 	\item $\mathsf{Encapsulate}(pk_A)$: On input the public key $pk_A$, %and a message $M\in\mathcal{M}$, 
-	the encapsulation algorithm $\mathsf{Encapsulate}$ first generates an ephemeral keypair $(epk, esk) = (g^r, r)$, performs a Diffie-Hellman key agreement between $pk_A$ and $esk$ to compute a shared secret $S_A$, and uses this shared secret as input to a KDF to produce the encapsulation key $K$. Finally, it outputs $(K, epk)$.
-	\item $\mathsf{Decapsulate}(sk_A, epk)$: On input the secret key $pk_A$, %and a message $M\in\mathcal{M}$, 
-	the decapsulation algorithm $\mathsf{Decapsulate}$ first performs a Diffie-Hellman key agreement between $epk$ and $sk_A$ to compute a shared secret $S_A$, and uses this shared secret as input to a KDF to produce the encapsulation key $K$. Finally, it outputs $K$.
+	the encapsulation algorithm $\mathsf{Encapsulate}$ first randomly generates an ephemeral keypair $(epk, esk) = (g^r, r)$, performs a Diffie-Hellman key agreement between $pk_A$ and $esk$ to compute a shared secret $S_A$, and uses this shared secret as input to the KDF to produce the key $K$. The encapsulated key $encKey$ is the ephemeral public key $epk$. Finally, it outputs $(K, encKey)$.
+	\item $\mathsf{Decapsulate}(sk_A, encKey)$: On input the secret key $pk_A$, and and encapsulated key $encKey$, the decapsulation algorithm $\mathsf{Decapsulate}$ first checks that $encKey$ is a valid public key. 
+	Next, it performs a Diffie-Hellman key agreement between $encKey$ and $sk_A$ to compute a shared secret $S_A$, and uses this shared secret as input to a KDF to produce the key $K$. Finally, it outputs $K$.
+	\item $\mathsf{Combine}(\{F_i\}_{i=1}^t)$: On input a set of $t$ fragments of an encapsulated key, each of them labeled as $F_i$, the combination algorithm $\mathsf{Combine}$, first parses each fragment $F_i$ as $(encKey_i, id_i)$. %$EPK_i||AE_i||ID_i$, and decodes both $EPK_i$ and $ID_i$ into $epk_i$ and $id_i$, respectively.
+Let $I = \{id_i\}_{i=1}^t$. Next, it computes the value $encKey'$ as follows:
+$$encKey' = \prod\limits_{i=1}^{t} (encKey_i)^{\lambda_{i, I}}
+\text{, where } \lambda_{i, I} = \prod\limits_{j=1, j\neq i}^{t} \frac{id_j}{id_j-id_i}$$
+Finally, it outputs $epk'$.
 \end{itemize}
 
 \subsection{Parameters of Umbral instantiation in NuCypher KMS}
