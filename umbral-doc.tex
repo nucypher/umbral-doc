@@ -64,9 +64,11 @@ In this section we present the Umbral PRE cryptosystem, defined by the following
 
 \begin{itemize}
 	%\item $\mathsf{Setup}(1^k)\rightarrow params$. On input the security parameter $1^k$, the global setup algorithm $\mathsf{Setup}$ outputs the global parameters $params$.
-	\item $\mathsf{KeyGen}()$: Sample $x \in \mathbb Z_q$, compute $g^x$ and output the keypair $(pk, sk) = (g^x, x)$.
-%	\item $\mathsf{ReKeyGen}(\sk{A}, \sk{B})$: On input the secret keys $\sk{A} = f_A$ and $\sk{B} = f_B$, the re-encryption key generation algorithm $\mathsf{ReKeyGen}$ computes the re-encryption key between users $A$ and $B$ as $\rk{A}{B} = \sk{A} \cdot \sk{B}^{-1} = f_A \cdot \invfB $.
-	
+	\item $\mathsf{KeyGen}()$: Sample $x \in \mathbb Z_q$ uniformly at random, compute $g^x$ and output the keypair $(pk, sk) = (g^x, x)$.
+
+	\item $\mathsf{ReKeyGen}(sk_A, sk_B, N, t)$: On input the secret keys $sk_{A} = a$ and $sk_{B} = b$, the re-encryption key generation algorithm $\mathsf{ReKeyGen}$ computes $N$ fragments of the re-encryption key between users $A$ and $B$. 
+	First it computes $s = a \cdot b^{-1} \bmod q$. Next it randomly samples a polynomial $f(x) \in \mathbb Z_q[x]$ of degree $t-1$, and a set $ID = \{ id_j \in \mathbb Z_q\mid 1 \leq j \leq N\}$. The algorithm ouputs the set $KF = \{ ( f(id_j), id_j) \mid id_j \in ID\}$.
+
 	\item $\mathsf{Enc}(pk_A, M)$: On input the public key $pk_A$ and a message $M\in\mathcal{M}$, the encryption algorithm $\mathsf{Enc}$ first computes $(K, encKey) = \mathsf{Encapsulate}(pk_A)$.  
 	%$EPK$ is the byte encoding of the point $epk$. 
 	$encData$ is the result of applying the authenticated encryption algorithm to $M$ with key $K$. 
@@ -75,7 +77,7 @@ In this section we present the Umbral PRE cryptosystem, defined by the following
 		\item $\mathsf{Dec}(sk_A, C)$: On input the secret key $sk_A$ and a ciphertext $C = (encKey, encData)$, the decryption algorithm $\mathsf{Dec}$ %first parses $C$ as $EPK||AE$, and decodes $epk$ from its byte representation $EPK$. Next, it 
 		computes the key $K = \mathsf{Decapsulate}(sk_A, epk)$, and decrypts ciphertext $AE$ using the decryption function of the AE scheme to obtain message $M$ if decryption is correct, and $\perp$ otherwise. Finally, it outputs message $M$ (or $\perp$ if decryption was invalid).
 		
-		\item $\mathsf{DecFrag}(sk_A, \{F_i\}_{i=1}^t, AE)$: On input the secret key $sk_A$ and a set of $t$ fragments of an encapsulated key, each of them labeled as $F_i$, and the encrypted data $encData$, the fragments decryption algorithm $\mathsf{DecFrag}$ first computes $encKey' = \mathsf{Combine}(\{F_i\}_{i=1}^t)$. With this result, it returns the result of $\mathsf{Dec}(sk_A, C')$, where $C' = (encKey', encData)$. % is the byte representation of $epk'$.
+		\item $\mathsf{DecFrags}(sk_A, \{F_i\}_{i=1}^t, AE)$: On input the secret key $sk_A$ and a set of $t$ fragments of an encapsulated key, each of them labeled as $F_i$, and the encrypted data $encData$, the fragments decryption algorithm $\mathsf{DecFrags}$ first computes $encKey' = \mathsf{Combine}(\{F_i\}_{i=1}^t)$. With this result, it returns the result of $\mathsf{Dec}(sk_A, C')$, where $C' = (encKey', encData)$. % is the byte representation of $epk'$.
 
 	
 	\item $\mathsf{ReEncFrag}(kFrag, encKey)$: On input a re-encryption key fragment $kFrag$, and an encapsulated key $encKey$, the fragmented re-encryption algorithm $\mathsf{ReEncFrag}$ first parses $kFrag = (rk, id)$, 
@@ -96,6 +98,10 @@ Finally, it outputs $epk'$.
 \end{itemize}
 
 \subsection{Parameters of Umbral instantiation in NuCypher KMS}
+The only restriction that the Umbral cryptosystem imposes on the choice of EC curve is that it should generate a group of prime order, since we will compute inverses module the order of the group.
+
+
+
 
 %secp256k1 curve
 % AE scheme: NaCL SecretBox (ChaCha20-Poly1305)
