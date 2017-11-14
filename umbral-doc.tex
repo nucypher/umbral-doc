@@ -8,7 +8,7 @@
 \usepackage{url}
 
 \title{Umbral: a threshold proxy re-encryption scheme}
-\author{David Núñez}
+\author{David Nuñez}
 \date{} % delete this line to display the current date
 
 %%% BEGIN DOCUMENT
@@ -20,12 +20,9 @@
 \maketitle
 
 \begin{abstract}
-This document describes the Umbral proxy re-encryption scheme used by NuCypher KMS. 
-Umbral is a threshold proxy re-encryption scheme based on ECIES-KEM \cite{ansi-x9.63} and BBS98 \cite{blaze1998divertible}. 
-
-%The name ``Umbral'' comes from the Spanish word for ``threshold''. 
-%Umbral ciphertexts have the same form than ECIES-KEM ciphertexts
-
+This document describes the Umbral proxy re-encryption scheme used by NuCypher KMS \cite{egorov2017nucypherkms}. 
+Umbral is a threshold proxy re-encryption scheme based on ECIES-KEM \cite{ansi-x9.63}, the BBS98 proxy re-encryption scheme  \cite{blaze1998divertible}, and Shamir's Secret Sharing \cite{shamir1979share}. 
+With Umbral, Alice (which in the generic name for data owners in NuCypher KMS) can delegate decryption rights to Bob for any ciphertext intended to her, through a re-encryption process performed by a set of $N$ semi-trusted proxies. When at least $t$ of these proxies (out of $N$) participate by performing re-encryption, Bob is able to combine these independent re-encrytions and decrypt the original message using his private key. 
 \end{abstract}
 
 %\tableofcontents
@@ -33,11 +30,17 @@ Umbral is a threshold proxy re-encryption scheme based on ECIES-KEM \cite{ansi-x
 
 \section{Introduction}
 
+
+%The name ``Umbral'' comes from the Spanish word for ``threshold''. 
+%Umbral ciphertexts have the same form than ECIES-KEM ciphertexts
+
+
+
 \section{Preliminaries}
 
 \subsection{Notation}
 
-Although the additive notation is the norm when dealing with elliptic curve cryptography, in this document we adopt the multiplicative notation to express the operations in the elliptic curve group, which is the usual approach in the proxy re-encryption literature (where schemes are defined in generic groups).
+Although the additive notation is the norm when dealing with elliptic curve cryptography, in this document we adopt the multiplicative notation to express the operations in the elliptic curve group, which is the usual approach in the proxy re-encryption literature (where schemes are usually defined in generic groups).
 
 \subsection{Proxy Re-Encryption}
 
@@ -46,17 +49,17 @@ Although the additive notation is the norm when dealing with elliptic curve cryp
 \subsection{ECIES}
 
 The Asymmetric Encryption Scheme defined in standard ANSI X9.63 \cite{ansi-x9.63}, also known as Elliptic Curve Integrated Encryption Scheme (ECIES), is a hybrid encryption algorithm based on elliptic curve cryptography, symmetric encryption and message authentication codes. 
-This algorithm is of public knowledge, and variants have been standardized also by ISO/IEC 18033-2 \cite{iso-18033-2} and IEEE P1363A \cite{ieee-p1363a}. A brief comparison of the different variants of ECIES can be found in \cite{martinez2010comparison}. 
+This algorithm is of public knowledge, and variants have been standardized also by ISO/IEC 18033-2 \cite{iso-18033-2} and IEEE P1363A \cite{ieee-p1363a}. A comparison of the different variants of ECIES can be found in \cite{gayoso2015security}. 
 
 When producing a ciphertext with ECIES, the sender first creates an ephemeral public key and uses it for a Diffie-Hellman key agreement together with the public key of the intended recipient. The resulting shared secret is used to create the keys for the symmetric encryption and message authentication code algorithms used internally. The final ciphertext consists of the ephemeral public key, as it is necessary for decryption, and the output of the symmetric encryption and message authentication code.
 
 A Sender can  be any entity that generates data and wants to send it confidentially to a receiver, in the form of a ciphertext encrypted under the public key of the receiver. 
-
+%
 A Receiver can be any entity that is entitled to read ciphertexts encrypted under his public key. We distinguish two types of receivers. The original receiver, which is the recipient of the data originally intended by the sender, and the delegated receiver, whom the original receiver entrusts to be able to decrypt ciphertexts initially intended to him. Therefore, there is a relation of delegation between the original receiver and the delegated one. 
-
+% 
 The Intermediary is an entity that controls the process of switching the public key of ciphertexts, from the public key of the original receiver to the public key of a delegated receiver, without being able to learn anything from the data. The Intermediary needs a key-switching key between the original and delegated receivers in order to be able to perform the key-switching process.
 
-ECIES can be used in a variety of elliptic curves, but we will restrict the choice of elliptic curves in our cryptosystem to those that generate a group of prime order. %ECIES define procedures for encryption and decryption, as well as defines 
+%ECIES can be used in a variety of elliptic curves, but we will restrict the choice of elliptic curves in our cryptosystem to those that generate a group of prime order. %ECIES define procedures for encryption and decryption, as well as defines 
 
 \section{The Umbral PRE cryptosystem}
 
@@ -66,23 +69,24 @@ In this section we present the Umbral PRE cryptosystem, defined by the following
 	%\item $\mathsf{Setup}(1^k)\rightarrow params$. On input the security parameter $1^k$, the global setup algorithm $\mathsf{Setup}$ outputs the global parameters $params$.
 	\item $\mathsf{KeyGen}()$: Sample $x \in \mathbb Z_q$ uniformly at random, compute $g^x$ and output the keypair $(pk, sk) = (g^x, x)$.
 
-	\item $\mathsf{ReKeyGen}(sk_A, sk_B, N, t)$: On input the secret keys $sk_{A} = a$ and $sk_{B} = b$, the re-encryption key generation algorithm $\mathsf{ReKeyGen}$ computes $N$ fragments of the re-encryption key between users $A$ and $B$. 
-	First it computes $s = a \cdot b^{-1} \bmod q$. Next it randomly samples a polynomial $f(x) \in \mathbb Z_q[x]$ of degree $t-1$, and a set $ID = \{ id_j \in \mathbb Z_q\mid 1 \leq j \leq N\}$. The algorithm ouputs the set $KF = \{ ( f(id_j), id_j) \mid id_j \in ID\}$.
+	\item $\mathsf{ReKeyGen}(sk_A, sk_B, N, t)$: On input the secret keys $sk_{A} = a$ and $sk_{B} = b$, a number of fragments $N$, and a threshold $t$, the re-encryption key generation algorithm $\mathsf{ReKeyGen}$ computes $N$ fragments of the re-encryption key between $A$ and $B$. 
+	First, it randomly samples $t-1$ elements $f_i\in \mathbb Z_q$, with $1 \leq i \leq t-1$, and  computes $f_0 = a \cdot b^{-1} \bmod q$. The next step is using these values, including $f_0$, to construct a polynomial $f(x) \in \mathbb Z_q[x]$ of degree $t-1$, such that $f(x) = f_0 + f_1x + f_2x^2 + ... + f_{t-1}x^{t-1}$.  Next, it randomly samples a set $ID = \{ id_j \in \mathbb Z_q\mid 1 \leq j \leq N\}$. The algorithm outputs the set of re-encryption key fragments $KF = \{ ( id_j, f(id_j)) \mid id_j \in ID\}$.
 
-	\item $\mathsf{Enc}(pk_A, M)$: On input the public key $pk_A$ and a message $M\in\mathcal{M}$, the encryption algorithm $\mathsf{Enc}$ first computes $(K, encKey) = \mathsf{Encapsulate}(pk_A)$.  
+	\item $\mathsf{Encrypt}(pk_A, M)$: On input the public key $pk_A$ and a message $M\in\mathcal{M}$, the encryption algorithm $\mathsf{Encrypt}$ first computes $(K, encKey) = \mathsf{Encapsulate}(pk_A)$.  
 	%$EPK$ is the byte encoding of the point $epk$. 
 	$encData$ is the result of applying the authenticated encryption algorithm to $M$ with key $K$. 
 	Finally, it outputs the ciphertext $C = (encKey, encData)$.
 	
-		\item $\mathsf{Dec}(sk_A, C)$: On input the secret key $sk_A$ and a ciphertext $C = (encKey, encData)$, the decryption algorithm $\mathsf{Dec}$ %first parses $C$ as $EPK||AE$, and decodes $epk$ from its byte representation $EPK$. Next, it 
-		computes the key $K = \mathsf{Decapsulate}(sk_A, epk)$, and decrypts ciphertext $AE$ using the decryption function of the AE scheme to obtain message $M$ if decryption is correct, and $\perp$ otherwise. Finally, it outputs message $M$ (or $\perp$ if decryption was invalid).
-		
-		\item $\mathsf{DecFrags}(sk_A, \{F_i\}_{i=1}^t, AE)$: On input the secret key $sk_A$ and a set of $t$ fragments of an encapsulated key, each of them labeled as $F_i$, and the encrypted data $encData$, the fragments decryption algorithm $\mathsf{DecFrags}$ first computes $encKey' = \mathsf{Combine}(\{F_i\}_{i=1}^t)$. With this result, it returns the result of $\mathsf{Dec}(sk_A, C')$, where $C' = (encKey', encData)$. % is the byte representation of $epk'$.
+		\item $\mathsf{Decrypt}(sk_A, C)$: On input the secret key $sk_A$ and a ciphertext $C = (encKey, encData)$, the decryption algorithm $\mathsf{Decrypt}$ %first parses $C$ as $EPK||AE$, and decodes $epk$ from its byte representation $EPK$. Next, it 
+		computes the key $K = \mathsf{Decapsulate}(sk_A, epk)$, and decrypts ciphertext $encData$ using the decryption function of the authenticated encryption scheme to obtain message $M$ if decryption is correct, and $\perp$ otherwise. Finally, it outputs message $M$ (or $\perp$ if decryption was invalid).
 
-	
-	\item $\mathsf{ReEncFrag}(kFrag, encKey)$: On input a re-encryption key fragment $kFrag$, and an encapsulated key $encKey$, the fragmented re-encryption algorithm $\mathsf{ReEncFrag}$ first parses $kFrag = (rk, id)$, 
+	\item $\mathsf{ReEncFrag}(kFrag, encKey)$: On input a re-encryption key fragment $kFrag$, and an encapsulated key $encKey$, the fragmented re-encryption algorithm $\mathsf{ReEncFrag}$ first parses $kFrag = (id, rk)$, 
 	and computes $encKey' = (encKey)^{rk}$. Finally it outputs the encapsulated key fragment $F = (encKey', id)$. 
+		
+		\item $\mathsf{DecryptFrags}(sk_A, \{F_i\}_{i=1}^t, encData)$: On input the secret key $sk_A$, a set of $t$ fragments of an encapsulated key, each of them labeled as $F_i$, and the encrypted data $encData$, the fragments decryption algorithm $\mathsf{DecryptFrags}$ first computes $encKey' = \mathsf{Combine}(\{F_i\}_{i=1}^t)$. With this result, it returns the output of $\mathsf{Decrypt}(sk_A, C')$, where $C' = (encKey', encData)$.
 \end{itemize}
+	
+
 
 \textbf{Auxiliary Functions}
 \begin{itemize}
@@ -98,14 +102,9 @@ Finally, it outputs $epk'$.
 \end{itemize}
 
 \subsection{Parameters of Umbral instantiation in NuCypher KMS}
-The only restriction that the Umbral cryptosystem imposes on the choice of EC curve is that it should generate a group of prime order, since we will compute inverses module the order of the group.
-
-
-
-
-%secp256k1 curve
+The only restriction that the Umbral cryptosystem imposes on the choice of EC curve is that it should generate a group of prime order, since we need to compute inverses modulo the order of this group. In our current setting, we use the secp256k1 curve, since it fulfills this latter requirement. 
 % AE scheme: NaCL SecretBox (ChaCha20-Poly1305)
 
-\bibliographystyle{abbrv}       % APS-like style for physics
+\bibliographystyle{unsrt}       % APS-like style for physics
 \bibliography{umbral-doc}
 \end{document}
