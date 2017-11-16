@@ -23,6 +23,8 @@
 This document describes the Umbral proxy re-encryption scheme used by NuCypher KMS \cite{egorov2017nucypherkms}. 
 Umbral is a threshold proxy re-encryption scheme based on ECIES-KEM \cite{ansi-x9.63}, the BBS98 proxy re-encryption scheme  \cite{blaze1998divertible}, and Shamir's Secret Sharing \cite{shamir1979share}. 
 With Umbral, Alice (which in the generic name for data owners in NuCypher KMS) can delegate decryption rights to Bob for any ciphertext intended to her, through a re-encryption process performed by a set of $N$ semi-trusted proxies. When at least $t$ of these proxies (out of $N$) participate by performing re-encryption, Bob is able to combine these independent re-encrytions and decrypt the original message using his private key. 
+...
+The name ``Umbral'' comes from the Spanish word for ``threshold'', emphasizing this characteristic of the scheme, given its central role in the NuCypher KMS architecture. 
 \end{abstract}
 
 %\tableofcontents
@@ -31,8 +33,10 @@ With Umbral, Alice (which in the generic name for data owners in NuCypher KMS) c
 \section{Introduction}
 
 
-%The name ``Umbral'' comes from the Spanish word for ``threshold''. 
-%Umbral ciphertexts have the same form than ECIES-KEM ciphertexts
+
+Umbral ciphertexts have ``almost'' the same form than ECIES ciphertexts. We say ``almost'' because we introduce some differences that are not supported by the various ECIES specifications; in any case, compliance with ECIES specifications is not one of our goals. 
+
+
 
 
 
@@ -60,6 +64,26 @@ A Receiver can be any entity that is entitled to read ciphertexts encrypted unde
 The Intermediary is an entity that controls the process of switching the public key of ciphertexts, from the public key of the original receiver to the public key of a delegated receiver, without being able to learn anything from the data. The Intermediary needs a key-switching key between the original and delegated receivers in order to be able to perform the key-switching process.
 
 %ECIES can be used in a variety of elliptic curves, but we will restrict the choice of elliptic curves in our cryptosystem to those that generate a group of prime order. %ECIES define procedures for encryption and decryption, as well as defines 
+
+\subsubsection{Differences between Umbral and ECIES}
+
+The two most important differences we introduce are the following:
+
+\begin{itemize}
+
+\item Single Hash Mode activated: 
+During encryption and decryption, the ephemeral public key is not included in the KDF input. This has some theoretical implications with respect to security, as it can make ECIES encryption malleable. For example, when the KDF only takes the $x$-coordinate of the input EC point, an attacker may replace the ephemeral public key (which is part of the ciphertext) by its inverse; however, this attack is very limited, to the point that Shoup calls this ``benign malleability'' \cite{shoup}. As countermeasure, some ECIES variants allow to include the ephemeral public key as part of the KDF input. In particular, the ISO/IEC 18033-2 standard specification defines an option called Single Hash Mode, which, when activated, removes the ephemeral public key as input to the KDF. Note that this mode is off by default in the ISO/IEC 18033-2 standard (i.e., the ephemeral public key is included).
+
+We must point out that Umbral takes advantage of this malleability during the re-encryption process, in order to transform ciphertexts from one recipient (Alice) to another (Bob). This is done precisely by altering the ephemeral key in the ciphertext. In order to do so, we require that Single Hash Mode is activated so the alteration of the ephemeral key doesn't affect the key derivation process. 
+
+As a final comment, we remark that a certain degree of malleability is unavoidable in any proxy re-encryption scheme, given that its goal is to \emph{transform} ciphertexts from one recipient to another. See \cite{canetti2007chosen} for a deeper discussion on the dichotomy between malleability and re-encryption.
+
+
+\item Authenticated Encryption: The original design of ECIES, in all its variants, uses a symmetric encryption algorithm and a message authentication code for protecting data's confidentiality, integrity and authenticity. However, for the sake of simplicity, we will use a single authenticated encryption primitive that combines all these functionalities. This same approach is used by others, such as the ECIES implementation in Google Tink \cite{tink}. 
+
+\end{itemize}
+
+
 
 \section{The Umbral PRE cryptosystem}
 
@@ -102,8 +126,11 @@ Finally, it outputs $epk'$.
 \end{itemize}
 
 \subsection{Parameters of Umbral instantiation in NuCypher KMS}
-The only restriction that the Umbral cryptosystem imposes on the choice of EC curve is that it should generate a group of prime order, since we need to compute inverses modulo the order of this group. In our current setting, we use the secp256k1 curve, since it fulfills this latter requirement. 
-% AE scheme: NaCL SecretBox (ChaCha20-Poly1305)
+The only restriction that the Umbral cryptosystem imposes on the choice of EC curve is that it should generate a group of prime order, since we need to compute inverses modulo the order of this group. In our current setting, we use the secp256k1 curve, since it fulfills this latter requirement; we are exploring other curve choices that could improve performance. 
+
+As per the authenticated encryption scheme, we use PyNaCl's SecretBox implementation, which in turn uses Salsa20-Poly1305.
+
+KDF?
 
 \bibliographystyle{unsrt}       % APS-like style for physics
 \bibliography{umbral-doc}
