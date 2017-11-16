@@ -1,5 +1,5 @@
-
-\documentclass[12pt]{article}
+\documentclass{amsart}
+\usepackage{amsaddr}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{geometry} % see geometry.pdf on how to lay out the page. There's lots.
@@ -9,6 +9,9 @@
 
 \title{Umbral: a threshold proxy re-encryption scheme}
 \author{David Nuñez}
+\address{Network, Information and Computer Security Laboratory (NICS Lab)\\
+University of Malaga, Spain}
+\email{dnunez@lcc.uma.es}  
 \date{} % delete this line to display the current date
 
 %%% BEGIN DOCUMENT
@@ -36,10 +39,6 @@ The name ``Umbral'' comes from the Spanish word for ``threshold'', emphasizing t
 
 Umbral ciphertexts have ``almost'' the same form than ECIES ciphertexts. We say ``almost'' because we introduce some differences that are not supported by the various ECIES specifications; in any case, compliance with ECIES specifications is not one of our goals. 
 
-
-
-
-
 \section{Preliminaries}
 
 \subsection{Notation}
@@ -49,6 +48,11 @@ Although the additive notation is the norm when dealing with elliptic curve cryp
 \subsection{Proxy Re-Encryption}
 
 (TODO: General description of proxy re-encryption, properties, etc)
+
+Proxy re-encryption is a special type of public-key encryption that permits a proxy to transform ciphertexts from one public key to another, without the proxy being able to learn any information about the original message \cite{nunez2017proxy}. 
+Thus, it serves as a means for delegating decryption rights, opening up many possible applications that require of delegated access to encrypted data. 
+
+
 
 \subsection{ECIES}
 
@@ -130,7 +134,7 @@ The only restriction that the Umbral cryptosystem imposes on the choice of EC cu
 
 As per the authenticated encryption scheme, we use PyNaCl's SecretBox implementation, which in turn uses Salsa20-Poly1305.
 
-KDF?
+For the KDF, we use HKDF with SHA-512 as hash function. 
 
 \bibliographystyle{unsrt}       % APS-like style for physics
 \bibliography{umbral-doc}
