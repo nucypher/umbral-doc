@@ -9,9 +9,8 @@
 
 \title{Umbral: a threshold proxy re-encryption scheme}
 \author{David Nuñez}
-\address{Network, Information and Computer Security Laboratory (NICS Lab)\\
-University of Malaga, Spain}
-\email{dnunez@lcc.uma.es}  
+%\address{Network, Information and Computer Security Laboratory (NICS Lab)\\University of Malaga, Spain}
+\email{david@nucypher.com}  
 \date{} % delete this line to display the current date
 
 %%% BEGIN DOCUMENT
@@ -24,9 +23,8 @@ University of Malaga, Spain}
 
 \begin{abstract}
 This document describes the Umbral proxy re-encryption scheme used by NuCypher KMS \cite{egorov2017nucypherkms}. 
-Umbral is a threshold proxy re-encryption scheme based on ECIES-KEM \cite{ansi-x9.63}, the BBS98 proxy re-encryption scheme  \cite{blaze1998divertible}, and Shamir's Secret Sharing \cite{shamir1979share}. 
+Umbral is a threshold proxy re-encryption scheme based on ECIES-KEM \cite{ansi-x9.63} and the BBS98 proxy re-encryption scheme  \cite{blaze1998divertible}. 
 With Umbral, Alice (which in the generic name for data owners in NuCypher KMS) can delegate decryption rights to Bob for any ciphertext intended to her, through a re-encryption process performed by a set of $N$ semi-trusted proxies. When at least $t$ of these proxies (out of $N$) participate by performing re-encryption, Bob is able to combine these independent re-encrytions and decrypt the original message using his private key. 
-...
 The name ``Umbral'' comes from the Spanish word for ``threshold'', emphasizing this characteristic of the scheme, given its central role in the NuCypher KMS architecture. 
 \end{abstract}
 
@@ -35,9 +33,14 @@ The name ``Umbral'' comes from the Spanish word for ``threshold'', emphasizing t
 
 \section{Introduction}
 
+NuCypher KMS \cite{egorov2017nucypherkms} is a decentralized key management system (KMS), encryption, and access control service. 
+It uses proxy re-encryption to delegate decryption rights, enabling this way the private sharing of data between arbitrary numbers of participants in public consensus networks, without revealing data keys to intermediary entities. 
 
+Umbral is a threshold proxy re-encryption scheme based on ECIES-KEM \cite{ansi-x9.63} and the BBS98 proxy re-encryption scheme \cite{blaze1998divertible}. With respect to the former, Umbral ciphertexts have ``almost'' the same form than ECIES ciphertexts: in both cases, they are composed of an encoded EC point used as ephemeral public key, an encrypted payload using a symmetric encryption algorithm and a MAC code. We say ``almost'' because we introduce some differences that are not supported by the various ECIES specifications; in any case, compliance with ECIES specifications is not one of our goals. 
+Finally, the threshold functionality of Umbral reuses ideas from Shamir's Secret Sharing \cite{shamir1979share}, although applied to the context of proxy re-encryption. 
 
-Umbral ciphertexts have ``almost'' the same form than ECIES ciphertexts. We say ``almost'' because we introduce some differences that are not supported by the various ECIES specifications; in any case, compliance with ECIES specifications is not one of our goals. 
+We also remark that we don't use directly Umbral as is, since it is an interactive scheme (i.e., re-encryption key generation requires the secret keys of both Alice and Bob). 
+Instead, we use a generic method to transform any interactive PRE scheme into non-interactive. 
 
 \section{Preliminaries}
 
