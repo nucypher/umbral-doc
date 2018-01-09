@@ -22,9 +22,9 @@
 \maketitle
 
 \begin{abstract}
-This document describes the Umbral proxy re-encryption scheme used by NuCypher KMS \cite{egorov2017nucypherkms}. 
-Umbral is a threshold proxy re-encryption scheme based on ECIES-KEM \cite{ansi-x9.63} and the BBS98 proxy re-encryption scheme  \cite{blaze1998divertible}. 
-With Umbral, Alice (which in the generic name for data owners in NuCypher KMS) can delegate decryption rights to Bob for any ciphertext intended to her, through a re-encryption process performed by a set of $N$ semi-trusted proxies. When at least $t$ of these proxies (out of $N$) participate by performing re-encryption, Bob is able to combine these independent re-encrytions and decrypt the original message using his private key. 
+This document describes the Umbral proxy re-encryption scheme, as used by NuCypher KMS \cite{egorov2017nucypherkms}. 
+Umbral is a threshold proxy re-encryption scheme following a Key Encapsulation Mechanism (KEM) approach. It is inspired by ECIES-KEM \cite{ansi-x9.63}, and the BBS98 proxy re-encryption scheme \cite{blaze1998divertible}. 
+With Umbral, Alice (which in the generic name for data owners in NuCypher KMS) can delegate decryption rights to Bob for any ciphertext intended to her, through a re-encryption process performed by a set of $N$ semi-trusted proxies. When at least $t$ of these proxies (out of $N$) participate by performing re-encryption, Bob is able to combine these independent re-encryptions and decrypt the original message using his private key. 
 The name ``Umbral'' comes from the Spanish word for ``threshold'', emphasizing this characteristic of the scheme, given its central role in the NuCypher KMS architecture. 
 \end{abstract}
 
@@ -36,11 +36,15 @@ The name ``Umbral'' comes from the Spanish word for ``threshold'', emphasizing t
 NuCypher KMS \cite{egorov2017nucypherkms} is a decentralized key management system (KMS), encryption, and access control service. 
 It uses proxy re-encryption to delegate decryption rights, enabling this way the private sharing of data between arbitrary numbers of participants in public consensus networks, without revealing data keys to intermediary entities. 
 
-Umbral is a threshold proxy re-encryption scheme based on ECIES-KEM \cite{ansi-x9.63} and the BBS98 proxy re-encryption scheme \cite{blaze1998divertible}. With respect to the former, Umbral ciphertexts have ``almost'' the same form than ECIES ciphertexts: in both cases, they are composed of an encoded EC point used as ephemeral public key, an encrypted payload using a symmetric encryption algorithm and a MAC code. We say ``almost'' because we introduce some differences that are not supported by the various ECIES specifications; in any case, compliance with ECIES specifications is not one of our goals. 
-Finally, the threshold functionality of Umbral reuses ideas from Shamir's Secret Sharing \cite{shamir1979share}, although applied to the context of proxy re-encryption. 
+Umbral is a threshold proxy re-encryption scheme loosely inspired by ECIES-KEM \cite{ansi-x9.63} (since the Umbral KEM is constructed similarly as in ECIES) and the BBS98 proxy re-encryption scheme \cite{blaze1998divertible}, although with several improvements to make it non-interactive, unidirectional, and most importantly, verifiable with respect to re-encryption. Finally, the threshold functionality of Umbral reuses ideas from Shamir's Secret Sharing \cite{shamir1979share}, although applied to the context of proxy re-encryption. 
 
-We also remark that we don't use directly Umbral as is, since it is an interactive scheme (i.e., re-encryption key generation requires the secret keys of both Alice and Bob). 
-Instead, we use a generic method to transform any interactive PRE scheme into non-interactive. 
+We provide a reference implementation in \cite{umbral-github}, instantiated over an elliptic curve group.
+
+%With respect to the former, Umbral ciphertexts have ``almost'' the same form than ECIES ciphertexts: in both cases, they are composed of an encoded EC point used as ephemeral public key, an encrypted payload using a symmetric encryption algorithm and a MAC code. We say ``almost'' because we introduce some differences that are not supported by the various ECIES specifications; in any case, compliance with ECIES specifications is not one of our goals. 
+%
+%
+%We also remark that we don't use directly Umbral as is, since it is an interactive scheme (i.e., re-encryption key generation requires the secret keys of both Alice and Bob). 
+%Instead, we use a generic method to transform any interactive PRE scheme into non-interactive. 
 
 \section{Preliminaries}
 
@@ -57,80 +61,143 @@ Thus, it serves as a means for delegating decryption rights, opening up many pos
 
 
 
-\subsection{ECIES}
-
-The Asymmetric Encryption Scheme defined in standard ANSI X9.63 \cite{ansi-x9.63}, also known as Elliptic Curve Integrated Encryption Scheme (ECIES), is a hybrid encryption algorithm based on elliptic curve cryptography, symmetric encryption and message authentication codes. 
-This algorithm is of public knowledge, and variants have been standardized also by ISO/IEC 18033-2 \cite{iso-18033-2} and IEEE P1363A \cite{ieee-p1363a}. A comparison of the different variants of ECIES can be found in \cite{gayoso2015security}. 
-
-When producing a ciphertext with ECIES, the sender first creates an ephemeral public key and uses it for a Diffie-Hellman key agreement together with the public key of the intended recipient. The resulting shared secret is used to create the keys for the symmetric encryption and message authentication code algorithms used internally. The final ciphertext consists of the ephemeral public key, as it is necessary for decryption, and the output of the symmetric encryption and message authentication code.
-
-A Sender can  be any entity that generates data and wants to send it confidentially to a receiver, in the form of a ciphertext encrypted under the public key of the receiver. 
+%\subsection{ECIES}
 %
-A Receiver can be any entity that is entitled to read ciphertexts encrypted under his public key. We distinguish two types of receivers. The original receiver, which is the recipient of the data originally intended by the sender, and the delegated receiver, whom the original receiver entrusts to be able to decrypt ciphertexts initially intended to him. Therefore, there is a relation of delegation between the original receiver and the delegated one. 
-% 
-The Intermediary is an entity that controls the process of switching the public key of ciphertexts, from the public key of the original receiver to the public key of a delegated receiver, without being able to learn anything from the data. The Intermediary needs a key-switching key between the original and delegated receivers in order to be able to perform the key-switching process.
-
-%ECIES can be used in a variety of elliptic curves, but we will restrict the choice of elliptic curves in our cryptosystem to those that generate a group of prime order. %ECIES define procedures for encryption and decryption, as well as defines 
-
-\subsubsection{Differences between Umbral and ECIES}
-
-The two most important differences we introduce are the following:
-
-\begin{itemize}
-
-\item Single Hash Mode activated: 
-During encryption and decryption, the ephemeral public key is not included in the KDF input. This has some theoretical implications with respect to security, as it can make ECIES encryption malleable. For example, when the KDF only takes the $x$-coordinate of the input EC point, an attacker may replace the ephemeral public key (which is part of the ciphertext) by its inverse; however, this attack is very limited, to the point that Shoup calls this ``benign malleability'' \cite{shoup}. As countermeasure, some ECIES variants allow to include the ephemeral public key as part of the KDF input. In particular, the ISO/IEC 18033-2 standard specification defines an option called Single Hash Mode, which, when activated, removes the ephemeral public key as input to the KDF. Note that this mode is off by default in the ISO/IEC 18033-2 standard (i.e., the ephemeral public key is included).
-
-We must point out that Umbral takes advantage of this malleability during the re-encryption process, in order to transform ciphertexts from one recipient (Alice) to another (Bob). This is done precisely by altering the ephemeral key in the ciphertext. In order to do so, we require that Single Hash Mode is activated so the alteration of the ephemeral key doesn't affect the key derivation process. 
-
-As a final comment, we remark that a certain degree of malleability is unavoidable in any proxy re-encryption scheme, given that its goal is to \emph{transform} ciphertexts from one recipient to another. See \cite{canetti2007chosen} for a deeper discussion on the dichotomy between malleability and re-encryption.
-
-
-\item Authenticated Encryption: The original design of ECIES, in all its variants, uses a symmetric encryption algorithm and a message authentication code for protecting data's confidentiality, integrity and authenticity. However, for the sake of simplicity, we will use a single authenticated encryption primitive that combines all these functionalities. This same approach is used by others, such as the ECIES implementation in Google Tink \cite{tink}. 
-
-\end{itemize}
-
-
+%The Asymmetric Encryption Scheme defined in standard ANSI X9.63 \cite{ansi-x9.63}, also known as Elliptic Curve Integrated Encryption Scheme (ECIES), is a hybrid encryption algorithm based on elliptic curve cryptography, symmetric encryption and message authentication codes. 
+%This algorithm is of public knowledge, and variants have been standardized also by ISO/IEC 18033-2 \cite{iso-18033-2} and IEEE P1363A \cite{ieee-p1363a}. A comparison of the different variants of ECIES can be found in \cite{gayoso2015security}. 
+%
+%When producing a ciphertext with ECIES, the sender first creates an ephemeral public key and uses it for a Diffie-Hellman key agreement together with the public key of the intended recipient. The resulting shared secret is used to create the keys for the symmetric encryption and message authentication code algorithms used internally. The final ciphertext consists of the ephemeral public key, as it is necessary for decryption, and the output of the symmetric encryption and message authentication code.
+%
+%A Sender can  be any entity that generates data and wants to send it confidentially to a receiver, in the form of a ciphertext encrypted under the public key of the receiver. 
+%%
+%A Receiver can be any entity that is entitled to read ciphertexts encrypted under his public key. We distinguish two types of receivers. The original receiver, which is the recipient of the data originally intended by the sender, and the delegated receiver, whom the original receiver entrusts to be able to decrypt ciphertexts initially intended to him. Therefore, there is a relation of delegation between the original receiver and the delegated one. 
+%% 
+%The Intermediary is an entity that controls the process of switching the public key of ciphertexts, from the public key of the original receiver to the public key of a delegated receiver, without being able to learn anything from the data. The Intermediary needs a key-switching key between the original and delegated receivers in order to be able to perform the key-switching process.
+%
+%%ECIES can be used in a variety of elliptic curves, but we will restrict the choice of elliptic curves in our cryptosystem to those that generate a group of prime order. %ECIES define procedures for encryption and decryption, as well as defines 
+%
+%\subsubsection{Differences between Umbral and ECIES}
+%
+%The two most important differences we introduce are the following:
+%
+%\begin{itemize}
+%
+%\item Single Hash Mode activated: 
+%During encryption and decryption, the ephemeral public key is not included in the KDF input. This has some theoretical implications with respect to security, as it can make ECIES encryption malleable. For example, when the KDF only takes the $x$-coordinate of the input EC point, an attacker may replace the ephemeral public key (which is part of the ciphertext) by its inverse; however, this attack is very limited, to the point that Shoup calls this ``benign malleability'' \cite{shoup}. As countermeasure, some ECIES variants allow to include the ephemeral public key as part of the KDF input. In particular, the ISO/IEC 18033-2 standard specification defines an option called Single Hash Mode, which, when activated, removes the ephemeral public key as input to the KDF. Note that this mode is off by default in the ISO/IEC 18033-2 standard (i.e., the ephemeral public key is included).
+%
+%We must point out that Umbral takes advantage of this malleability during the re-encryption process, in order to transform ciphertexts from one recipient (Alice) to another (Bob). This is done precisely by altering the ephemeral key in the ciphertext. In order to do so, we require that Single Hash Mode is activated so the alteration of the ephemeral key doesn't affect the key derivation process. 
+%
+%As a final comment, we remark that a certain degree of malleability is unavoidable in any proxy re-encryption scheme, given that its goal is to \emph{transform} ciphertexts from one recipient to another. See \cite{canetti2007chosen} for a deeper discussion on the dichotomy between malleability and re-encryption.
+%
+%
+%\item Authenticated Encryption: The original design of ECIES, in all its variants, uses a symmetric encryption algorithm and a message authentication code for protecting data's confidentiality, integrity and authenticity. However, for the sake of simplicity, we will use a single authenticated encryption primitive that combines all these functionalities. This same approach is used by others, such as the ECIES implementation in Google Tink \cite{tink}. 
+%
+%\end{itemize}
+%
+%
+%
 
 \section{The Umbral PRE cryptosystem}
 
 In this section we present the Umbral PRE cryptosystem, defined by the following algorithms:
 
+\subsection{Syntax}
+
+
+\subsection{The KEM construction}
+
+\subsubsection{Key Generation Algorithms}
+
 \begin{itemize}
 	%\item $\mathsf{Setup}(1^k)\rightarrow params$. On input the security parameter $1^k$, the global setup algorithm $\mathsf{Setup}$ outputs the global parameters $params$.
-	\item $\mathsf{KeyGen}()$: Sample $x \in \mathbb Z_q$ uniformly at random, compute $g^x$ and output the keypair $(pk, sk) = (g^x, x)$.
+	\item $\mathsf{KeyGen}()$: Sample $a \in \mathbb Z_q$ uniformly at random, compute $g^a$ and output the keypair $(pk, sk) = (g^a, a)$.
 
-	\item $\mathsf{ReKeyGen}(sk_A, sk_B, N, t)$: On input the secret keys $sk_{A} = a$ and $sk_{B} = b$, a number of fragments $N$, and a threshold $t$, the re-encryption key generation algorithm $\mathsf{ReKeyGen}$ computes $N$ fragments of the re-encryption key between $A$ and $B$. 
-	First, it randomly samples $t-1$ elements $f_i\in \mathbb Z_q$, with $1 \leq i \leq t-1$, and  computes $f_0 = a \cdot b^{-1} \bmod q$. The next step is using these values, including $f_0$, to construct a polynomial $f(x) \in \mathbb Z_q[x]$ of degree $t-1$, such that $f(x) = f_0 + f_1x + f_2x^2 + ... + f_{t-1}x^{t-1}$.  Next, it randomly samples a set $ID = \{ id_j \in \mathbb Z_q\mid 1 \leq j \leq N\}$. The algorithm outputs the set of re-encryption key fragments $KF = \{ ( id_j, f(id_j)) \mid id_j \in ID\}$.
-
-	\item $\mathsf{Encrypt}(pk_A, M)$: On input the public key $pk_A$ and a message $M\in\mathcal{M}$, the encryption algorithm $\mathsf{Encrypt}$ first computes $(K, encKey) = \mathsf{Encapsulate}(pk_A)$.  
-	%$EPK$ is the byte encoding of the point $epk$. 
-	$encData$ is the result of applying the authenticated encryption algorithm to $M$ with key $K$. 
-	Finally, it outputs the ciphertext $C = (encKey, encData)$.
+	\item $\mathsf{ReKeyGen}(sk_A, pk_B, N, t)$: On input the secret key $sk_{A} = a$, the public key of the intended delegatee $pk_{B} = g^b$, a number of fragments $N$, and a threshold $t$, the re-encryption key generation algorithm $\mathsf{ReKeyGen}$ computes $N$ fragments of the re-encryption key between $A$ and $B$ as follows:
 	
-		\item $\mathsf{Decrypt}(sk_A, C)$: On input the secret key $sk_A$ and a ciphertext $C = (encKey, encData)$, the decryption algorithm $\mathsf{Decrypt}$ %first parses $C$ as $EPK||AE$, and decodes $epk$ from its byte representation $EPK$. Next, it 
-		computes the key $K = \mathsf{Decapsulate}(sk_A, epk)$, and decrypts ciphertext $encData$ using the decryption function of the authenticated encryption scheme to obtain message $M$ if decryption is correct, and $\perp$ otherwise. Finally, it outputs message $M$ (or $\perp$ if decryption was invalid).
+	\begin{enumerate}
+\item Sample random $x_A \in \mathbb Z_q$ and compute $X_A = g^{x_A}$
+\item Compute $ d = H_3(X_A, pk_B, (pk_B)^{x_A})$. Note how $d$ is the result of a non-interactive Diffie-Hellman key exchange between $B$'s keypair and the ephemeral key pair $(x_A, X_A)$. We will use this shared secret to make the re-encryption key generation of the scheme non-interactive.
+\item Sample random $t-1$ elements $f_i\in \mathbb Z_q$, with $1 \leq i \leq t-1$, and  compute $f_0 = a \cdot b^{-1} \bmod q$.
+\item Construct a polynomial $f(x) \in \mathbb Z_q[x]$ of degree $t-1$, such that $f(x) = f_0 + f_1x + f_2x^2 + ... + f_{t-1}x^{t-1}$.  
+\item Initialize set $KF = \emptyset$ and repeat $N$ times:
 
-	\item $\mathsf{ReEncFrag}(kFrag, encKey)$: On input a re-encryption key fragment $kFrag$, and an encapsulated key $encKey$, the fragmented re-encryption algorithm $\mathsf{ReEncFrag}$ first parses $kFrag = (id, rk)$, 
-	and computes $encKey' = (encKey)^{rk}$. Finally it outputs the encapsulated key fragment $F = (encKey', id)$. 
-		
-		\item $\mathsf{DecryptFrags}(sk_A, \{F_i\}_{i=1}^t, encData)$: On input the secret key $sk_A$, a set of $t$ fragments of an encapsulated key, each of them labeled as $F_i$, and the encrypted data $encData$, the fragments decryption algorithm $\mathsf{DecryptFrags}$ first computes $encKey' = \mathsf{Combine}(\{F_i\}_{i=1}^t)$. With this result, it returns the output of $\mathsf{Decrypt}(sk_A, C')$, where $C' = (encKey', encData)$.
+    \begin{enumerate}
+    \item Sample random $y, id \in \mathbb Z_q$ and compute $Y = g^y$ and $rk = f(id)$
+    \item Compute $U_1 = U^{rk}$
+    \item Compute $z_1 = H_4(X_A, U_1, Y, id)$, and $z_2 = y - a \cdot z_1$
+    \item Define a re-encryption key fragment $kFrag$ as the tuple $(id, rk, X_A, U_1, z_1, z_2)$
+    \item $KF = KF \cup \{kFrag\}$
+
+\end{enumerate}
+
+\item Finally, output the set of re-encryption key fragments $KF$.
+\end{enumerate}
 \end{itemize}
-	
 
 
-\textbf{Auxiliary Functions}
+\subsubsection{Encapsulation and Decapsulation}
+
 \begin{itemize}
-	\item $\mathsf{Encapsulate}(pk_A)$: On input the public key $pk_A$, %and a message $M\in\mathcal{M}$, 
-	the encapsulation algorithm $\mathsf{Encapsulate}$ first randomly generates an ephemeral keypair $(epk, esk) = (g^r, r)$, performs a Diffie-Hellman key agreement between $pk_A$ and $esk$ to compute a shared secret $S_A$, and uses this shared secret as input to the KDF to produce the key $K$. The encapsulated key $encKey$ is the ephemeral public key $epk$. Finally, it outputs $(K, encKey)$.
-	\item $\mathsf{Decapsulate}(sk_A, encKey)$: On input the secret key $pk_A$, and and encapsulated key $encKey$, the decapsulation algorithm $\mathsf{Decapsulate}$ first checks that $encKey$ is a valid public key. 
-	Next, it performs a Diffie-Hellman key agreement between $encKey$ and $sk_A$ to compute a shared secret $S_A$, and uses this shared secret as input to a KDF to produce the key $K$. Finally, it outputs $K$.
-	\item $\mathsf{Combine}(\{F_i\}_{i=1}^t)$: On input a set of $t$ fragments of an encapsulated key, each of them labeled as $F_i$, the combination algorithm $\mathsf{Combine}$, first parses each fragment $F_i$ as $(encKey_i, id_i)$. %$EPK_i||AE_i||ID_i$, and decodes both $EPK_i$ and $ID_i$ into $epk_i$ and $id_i$, respectively.
-Let $I = \{id_i\}_{i=1}^t$. Next, it computes the value $encKey'$ as follows:
-$$encKey' = \prod\limits_{i=1}^{t} (encKey_i)^{\lambda_{i, I}}
-\text{, where } \lambda_{i, I} = \prod\limits_{j=1, j\neq i}^{t} \frac{id_j}{id_j-id_i}$$
-Finally, it outputs $epk'$.
+	\item $\mathsf{Encapsulate}(pk_A)$: On input the public key $pk_A$, the encapsulation algorithm $\mathsf{Encapsulate}$ first samples random $r, u \in \mathbb Z_q$ and computes $E = g^r$ and $V = g^u$. 
+	Next, it computes the value $s = u + r \cdot H_2(E, V)$. 
+	The derived key is computed as $K = \mathsf{KDF}((pk_A)^{r + u})$. 
+	The tuple $(E, V, s)$ is called $capsule$ and allows to derive again (i.e., ``decapsulate'') the symmetric key $K$. 
+	Finally, the encapsulation algorithm outputs $(K, capsule)$.	
+	
+	\item $\mathsf{CheckCapsule}(capsule)$: On input a $capsule = (E, V, s)$, this algorithm examines the validity of the capsule by checking if the following equation holds:
+	$$ g^s \stackrel{?}{=} V \cdot E^{H_2(E, V)}$$
+	
+	\item $\mathsf{Decapsulate}(sk_A, capsule)$: On input the secret key $sk_A = a$, and an original $capsule = (E,V,s)$, the decapsulation algorithm $\mathsf{Decapsulate}$ first checks the validity of the capsule with $\mathsf{CheckCapsule}$ and outputs $\perp$ if the check fails. Otherwise, it computes $K = \mathsf{KDF}((E\cdot V)^{a})$. Finally, it outputs $K$.
+	
+	\item $\mathsf{Decapsulate'}(sk_B, capsule')$: On input the secret key $sk_B = b$, and a reconstructed capsule $capsule' = (E',V', X_A)$, the decapsulation algorithm $\mathsf{Decapsulate'}$ first computes $d = H_3(X_A, pk_B, X_A^b)$. Recall that $d$ is the result of a non-interactive Diffie-Hellman key exchange between $B$'s keypair and the ephemeral key pair $(x_A, X_A)$. 
+	%Next, it checks the validity of the reconstructed capsule with $\mathsf{CheckCapsule}$ and outputs $\perp$ if the check fails. Otherwise, 
+	Next, it computes $K = \mathsf{KDF}((E'\cdot V')^{d})$. Finally, it outputs $K$.
+	
 \end{itemize}
+
+\subsubsection{Re-Encryption and Verification}
+
+\begin{itemize}
+\item $\mathsf{CapsuleReenc}(kFrag, capsule)$: On input a re-encryption key fragment $kFrag= (id, rk, X_A, U_1, z_1, z_2)$, and a $capsule = (E,V,s)$, the capsule re-encryption algorithm $\mathsf{CapsuleReenc}$ first checks the validity of the capsule with $\mathsf{CheckCapsule}$ and outputs $\perp$ if the check fails. Otherwise, it computes $E_1 = E^{rk}$ and $V_1 = V^{rk}$, and outputs the capsule fragment $cFrag = (E_1, V_1, id, X_A)$. 
+
+\item $\mathsf{Reconstruct}(\{cFrag_i\}_{i=1}^t)$: On input a set of $t$ capsule fragments, each of them labeled as $cFrag_i$, the reconstruction algorithm $\mathsf{Reconstruct}$, first parses each fragment $cFrag_i$ as the tuple $(E_{1,i}, V_{1,i}, id_i, X_A)$. 
+	Let $I = \{id_i\}_{i=1}^t$. Next, it computes the values $E'$ and $V'$ as follows:
+$$E' = \prod\limits_{i=1}^{t} (E_{1,i})^{\lambda_{i, I}},\qquad
+V' = \prod\limits_{i=1}^{t} (V_{1,i})^{\lambda_{i, I}},
+\text{\qquad where } \lambda_{i, I} = \prod\limits_{j=1, j\neq i}^{t} \frac{id_j}{id_j-id_i}$$
+Finally, it outputs the reconstructed capsule $(E', V', X_A)$.
+
+\end{itemize}
+
+		
+
+\subsection{The KEM/DEM construction}
+
+\begin{itemize}
+	
+	\item $\mathsf{Encrypt}(pk_A, M)$: On input the public key $pk_A$ and a message $M\in\mathcal{M}$, the encryption algorithm $\mathsf{Encrypt}$ first computes $(K, capsule) = \mathsf{Encapsulate}(pk_A)$.
+	$encData$ is the result of applying the authenticated encryption algorithm $\mathsf{AEnc}$ to $M$ with key $K$. 
+	Finally, it outputs the ciphertext $C = (capsule, encData)$.
+	
+	\item $\mathsf{Decrypt}(sk_A, C)$: On input the secret key $sk_A$ and a ciphertext $C = (capsule, encData)$, the decryption algorithm $\mathsf{Decrypt}$ computes the key $K = \mathsf{Decapsulate}(sk_A, capsule)$, and decrypts ciphertext $encData$ using the decryption function of the authenticated encryption algorithm $\mathsf{AEnc}$ to obtain message $M$ if decryption is correct, and $\perp$ otherwise. Finally, it outputs message $M$ (or $\perp$ if decryption was invalid).
+
+	
+	\item $\mathsf{DecryptFrags}(sk_B, \{cFrag_i\}_{i=1}^t, encData)$: On input the secret key $sk_B$, a set of $t$ capsule fragments, each of them labeled as $cFrag_i$, and the encrypted data $encData$, the fragments decryption algorithm $\mathsf{DecryptFrags}$ first computes 
+	
+%		\begin{enumerate}
+%\item Compute $ d = H_3(X_A, pk_B, X_A^b)$. Recall that $d$ is the result of a non-interactive Diffie-Hellman key exchange between $B$'s keypair and the ephemeral key pair $(x_A, X_A)$. 
+%\item omputes $E = g^r$ and $V = g^u$. 
+%	Next, it computes the value $s = u + r \cdot H_2(E, V)$. 
+%	The derived key is computed as $K = \mathsf{KDF}((pk_A)^{r + u})$. 
+%
+%
+%
+%\end{enumerate}
+	
+%	$capsule' = \mathsf{Combine}(\{cFrag_i\}_{i=1}^t)$. With this result, it returns the output of $\mathsf{Decrypt}(sk_A, C')$, where $C' = (encKey', encData)$.
+\end{itemize}
+	
+
 
 \subsection{Parameters of Umbral instantiation in NuCypher KMS}
 The only restriction that the Umbral cryptosystem imposes on the choice of EC curve is that it should generate a group of prime order, since we need to compute inverses modulo the order of this group. In our current setting, we use the secp256k1 curve, since it fulfills this latter requirement; we are exploring other curve choices that could improve performance. 
