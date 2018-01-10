@@ -6,6 +6,15 @@
 \geometry{a4paper} % or letter or a5paper or ... etc
 \usepackage[utf8]{inputenc}
 \usepackage{url}
+\usepackage{graphicx}
+
+
+\newcommand{\rk}[2]{rk_{#1\rightarrow#2}}
+\providecommand{\pk}[1]{pk_{#1}}
+\providecommand{\sk}[1]{sk_{#1}}
+\newcommand{\etal}{\emph{et al.\ }}
+
+
 
 \title{Umbral: a threshold proxy re-encryption scheme}
 \author{David Nuñez}
@@ -52,12 +61,26 @@ We provide a reference implementation in \cite{umbral-github}, instantiated over
 
 Although the additive notation is the norm when dealing with elliptic curve cryptography, in this document we adopt the multiplicative notation to express the operations in the elliptic curve group, which is the usual approach in the proxy re-encryption literature (where schemes are usually defined in generic groups).
 
-\subsection{Proxy Re-Encryption}
+\subsection{A brief introduction to Proxy Re-Encryption}
 
 (TODO: General description of proxy re-encryption, properties, etc)
 
-Proxy re-encryption is a special type of public-key encryption that permits a proxy to transform ciphertexts from one public key to another, without the proxy being able to learn any information about the original message \cite{nunez2017proxy}. 
-Thus, it serves as a means for delegating decryption rights, opening up many possible applications that require of delegated access to encrypted data. 
+Proxy re-encryption is a special type of public-key encryption that permits a proxy to transform ciphertexts from one public key to another, without the proxy being able to learn any information about the original message; to do so, the proxy must be in possession of a \emph{re-encryption key} that enables this process \cite{nunez2017proxy}. Thus, it serves as a means for delegating decryption rights, opening up many possible applications that require of delegated access to encrypted data. In the PRE literature, the parties involved are usually labeled in terms of a relationship of delegation, namely: %. A typical proxy re-encryption environment involves at least three parties:
+\begin{itemize}
+\item Delegator: This actor is the one that \emph{delegates} his decryption rights using proxy re-encryption. In order to do this he creates a re-encryption key, which he sends to the proxy. We usually refer to the delegator as ``Alice''.
+\item Delegatee: The delegatee is granted a delegated right to decrypt ciphertexts that, although were not intended for him in the first place, where re-encrypted for him with permission from the original recipient (i.e., the delegator). This actor usually takes the name ``Bob''.
+\item Proxy: It handles the re-encryption process that transforms ciphertexts under the delegator's public key into ciphertexts that the delegatee can decrypt using his private key. The proxy uses the re-encryption key during this process, and does not learn any additional information. 
+\end{itemize}
+
+\begin{figure}%[h]
+\centering
+\includegraphics[width=0.75\textwidth]{pre.pdf}
+\caption{Main actors and interactions in a PRE environment}
+\label{fig:pre-actores}
+\end{figure}
+
+Figure~\ref{fig:pre-actores} depicts the main actors in a PRE environment and their interactions. Since PRE is a special type of PKE, users also have a pair of public and private keys, as shown in the figure. Hence, anyone that knows a public key is capable of producing ciphertexts intended for the corresponding recipient; conversely, these ciphertexts can only be decrypted using the corresponding decryption key. 
+The distinctive aspect is that ciphertexts can be re-encrypted in order to be decrypted by a different private key than the one originally intended. 
 
 
 
@@ -99,12 +122,60 @@ Thus, it serves as a means for delegating decryption rights, opening up many pos
 
 \section{The Umbral PRE cryptosystem}
 
-In this section we present the Umbral PRE cryptosystem, defined by the following algorithms:
+In this section we present the Umbral PRE cryptosystem. However, since Umbral is designed following the KEM/DEM approach, our focus will be in the Umbral KEM, since the DEM part is not affected by the ``re-encryption'' process. Note that when referring to ``re-encryption'' we are actually dealing with the transformation of the KEM ciphertexts (or ``capsules''), so technically, it appears it is more appropriate to call this process ``re-encapsulation''. This would lead to the natural sequence of encapsulation/re-encapsulation/decapsulation, as shown in Figure~\ref{fig:umbral-kem}. When possible we will use the term ``re-encapsulation'', although we will continue to use ``re-encryption'' in some contexts such as ``re-encryption keys'', since in the end Umbral KEM will be used as part of a full-fledged proxy re-encryption scheme. 
 
-\subsection{Syntax}
+In this section we will first describe the syntax of the Umbral KEM; next, we present its construction; and finally, its integration with a DEM (i.e., a symmetric encryption algorithm) to produce the Umbral proxy re-encryption scheme. 
+
+\begin{figure}%[h]
+\centering
+\includegraphics[width=\textwidth]{umbral-kem-flow.pdf}
+\caption{Main operation of Umbral KEM. Operations are shown in yellow, cryptographic keys in gray, and data in white}
+\label{fig:umbral-kem}
+\end{figure}
+
+\subsection{Syntax of the Umbral KEM}
+
+The following is a description of the basic functions provided by Umbral KEM. For clarity we have categorized these functions in different groups according to their functionality. 
+
+\subsubsection{Key Generation Algorithms}
+
+\begin{itemize}
+
+	\item $\mathsf{KeyGen}()$: The key generation algorithm $\mathsf{KeyGen}$ outputs a pair of public and secret keys $(\pk{A}, \sk{A})$.
+	\item $\mathsf{ReKeyGen}(sk_A, pk_B, N, t)$: On input the secret key $sk_{A} = a$, the public key of the intended delegatee $pk_{B} = g^b$, a number of fragments $N$, and a threshold $t$, the re-encryption key generation algorithm $\mathsf{ReKeyGen}$ computes $N$ fragments of the re-encryption key between $A$ and $B$, each of them named $kFrag$. 
+\end{itemize}
 
 
-\subsection{The KEM construction}
+\subsubsection{Encapsulation and Decapsulation}
+
+\begin{itemize}
+	\item $\mathsf{Encapsulate}(pk_A)$: On input the public key $pk_A$, the encapsulation algorithm $\mathsf{Encapsulate}$ a symmetric key $K$ and a $capsule$ that allows to derive again (i.e., ``decapsulate'') the symmetric key $K$. 
+	
+	\item $\mathsf{Decapsulate}(sk_A, capsule)$: On input the secret key $sk_A$, and an original $capsule$, the decapsulation algorithm $\mathsf{Decapsulate}$ outputs the symmetric key $K$, or $\perp$ if the capsule is invalid. 
+	
+	\item $\mathsf{DecapsulateFrags}(sk_B, \{cFrag_i\}_{i=1}^t)$: On input the secret key $sk_B$, and a set of $t$ capsule fragments or $cFrags$, the algorithm outputs the symmetric key $K$, or $\perp$ if the decryption fails. 
+	
+\end{itemize}
+
+\subsubsection{Re-Encapsulation}%ryption and Verification of Re-Encryption}
+
+\begin{itemize}
+\item $\mathsf{ReEncapsulation}(kFrag, capsule)$: On input a re-encryption key fragment $kFrag$, and a $capsule$, the re-encapsulation algorithm $\mathsf{ReEncapsulation}$ outputs the capsule fragment $cFrag$, or $\perp$ if the the process fails.
+
+\end{itemize}
+
+\subsection{The Umbral KEM construction}
+
+\subsubsection{Setup and public parameters}
+
+\begin{itemize}
+
+\item $\mathsf{Setup}(sec)$: The setup algorithm first determines a cyclic group $\mathbb G$ of prime order $q$, according to the security parameter $sec$. Let $g, U\in \mathbb G$ be generators. Let $H_2: \mathbb G^2 \to \mathbb Z_q$, $H_3: \mathbb G^3 \to \mathbb Z_q$, and $H_4: \mathbb G^3 \times Z_q \to \mathbb Z_q$ be hash functions that behave as random oracles. Let $\mathsf{KDF}: \mathbb G \to \{0,1\}^\ell$ be a key derivation function also modeled as a random oracle, where $\ell$ is according to the security parameter $sec$. The global public parameters are represented by the tuple:
+$$params = (\mathbb G, g, U, H_2, H_3, H_4, \mathsf{KDF})$$
+
+\end{itemize}
+
+For simplicity, we will omit the public parameters from the rest of the functions. 
 
 \subsubsection{Key Generation Algorithms}
 
@@ -127,8 +198,7 @@ In this section we present the Umbral PRE cryptosystem, defined by the following
     \item Compute $z_1 = H_4(X_A, U_1, Y, id)$, and $z_2 = y - a \cdot z_1$
     \item Define a re-encryption key fragment $kFrag$ as the tuple $(id, rk, X_A, U_1, z_1, z_2)$
     \item $KF = KF \cup \{kFrag\}$
-
-\end{enumerate}
+	\end{enumerate}
 
 \item Finally, output the set of re-encryption key fragments $KF$.
 \end{enumerate}
@@ -149,29 +219,34 @@ In this section we present the Umbral PRE cryptosystem, defined by the following
 	
 	\item $\mathsf{Decapsulate}(sk_A, capsule)$: On input the secret key $sk_A = a$, and an original $capsule = (E,V,s)$, the decapsulation algorithm $\mathsf{Decapsulate}$ first checks the validity of the capsule with $\mathsf{CheckCapsule}$ and outputs $\perp$ if the check fails. Otherwise, it computes $K = \mathsf{KDF}((E\cdot V)^{a})$. Finally, it outputs $K$.
 	
-	\item $\mathsf{Decapsulate'}(sk_B, capsule')$: On input the secret key $sk_B = b$, and a reconstructed capsule $capsule' = (E',V', X_A)$, the decapsulation algorithm $\mathsf{Decapsulate'}$ first computes $d = H_3(X_A, pk_B, X_A^b)$. Recall that $d$ is the result of a non-interactive Diffie-Hellman key exchange between $B$'s keypair and the ephemeral key pair $(x_A, X_A)$. 
-	%Next, it checks the validity of the reconstructed capsule with $\mathsf{CheckCapsule}$ and outputs $\perp$ if the check fails. Otherwise, 
-	Next, it computes $K = \mathsf{KDF}((E'\cdot V')^{d})$. Finally, it outputs $K$.
+	\item $\mathsf{DecapsulateFrags}(sk_B, \{cFrag_i\}_{i=1}^t)$: On input the secret key $sk_B = b$, and a set of $t$ capsule fragments, being each of them $cFrag_i = (E_{1,i}, V_{1,i}, id_i, X_A)$. Note that the value $X_A$ is the same for all the $cFrags$ that are produced by re-encryptions using a $kFrag$ in the set of re-encryption key fragments $KF$. 
 	
+	\begin{enumerate}
+    \item Let $I = \{id_i\}_{i=1}^t$. For all $id_i\in I$, compute $\lambda_{i, I} = \prod\limits_{j=1, j\neq i}^{t} \frac{id_j}{id_j-id_i}$
+    \item Compute the values:
+     	$$E' = \prod\limits_{i=1}^{t} (E_{1,i})^{\lambda_{i, I}}	
+		\qquad
+		V' = \prod\limits_{i=1}^{t} (V_{1,i})^{\lambda_{i, I}}$$
+	\item Compute $d = H_3(X_A, pk_B, X_A^b)$. Recall that $d$ is the result of a non-interactive Diffie-Hellman key exchange between $B$'s keypair and the ephemeral key pair $(x_A, X_A)$. 
+	\item Finally, output the symmetric key $K= \mathsf{KDF}((E'\cdot V')^{d})$. 
+	\end{enumerate}
 \end{itemize}
 
-\subsubsection{Re-Encryption and Verification}
+\subsubsection{Re-Encapsulation}%ryption and Verification of Re-Encryption}
 
 \begin{itemize}
-\item $\mathsf{CapsuleReenc}(kFrag, capsule)$: On input a re-encryption key fragment $kFrag= (id, rk, X_A, U_1, z_1, z_2)$, and a $capsule = (E,V,s)$, the capsule re-encryption algorithm $\mathsf{CapsuleReenc}$ first checks the validity of the capsule with $\mathsf{CheckCapsule}$ and outputs $\perp$ if the check fails. Otherwise, it computes $E_1 = E^{rk}$ and $V_1 = V^{rk}$, and outputs the capsule fragment $cFrag = (E_1, V_1, id, X_A)$. 
+\item $\mathsf{ReEncapsulate}(kFrag, capsule)$: On input a re-encryption key fragment $kFrag= (id, rk, X_A, U_1, z_1, z_2)$, and a $capsule = (E,V,s)$, the re-encapsulation algorithm $\mathsf{ReEncapsulate}$ first checks the validity of the capsule with $\mathsf{CheckCapsule}$ and outputs $\perp$ if the check fails. Otherwise, it computes $E_1 = E^{rk}$ and $V_1 = V^{rk}$, and outputs the capsule fragment $cFrag = (E_1, V_1, id, X_A)$. 
 
-\item $\mathsf{Reconstruct}(\{cFrag_i\}_{i=1}^t)$: On input a set of $t$ capsule fragments, each of them labeled as $cFrag_i$, the reconstruction algorithm $\mathsf{Reconstruct}$, first parses each fragment $cFrag_i$ as the tuple $(E_{1,i}, V_{1,i}, id_i, X_A)$. 
-	Let $I = \{id_i\}_{i=1}^t$. Next, it computes the values $E'$ and $V'$ as follows:
-$$E' = \prod\limits_{i=1}^{t} (E_{1,i})^{\lambda_{i, I}},\qquad
-V' = \prod\limits_{i=1}^{t} (V_{1,i})^{\lambda_{i, I}},
-\text{\qquad where } \lambda_{i, I} = \prod\limits_{j=1, j\neq i}^{t} \frac{id_j}{id_j-id_i}$$
-Finally, it outputs the reconstructed capsule $(E', V', X_A)$.
+
+
 
 \end{itemize}
 
 		
 
 \subsection{The KEM/DEM construction}
+
+Extending Umbral KEM with a DEM results in a full-fledged proxy re-encryption scheme. As such, this defines encryption and decryption algorithms, rather than encapsulation and decapsulations. Note how the re-encryption algorithm actually does not involve any symmetric encryption operation. We omit the key generation algorithms since they are not changed in the extension. 
 
 \begin{itemize}
 	
@@ -180,21 +255,11 @@ Finally, it outputs the reconstructed capsule $(E', V', X_A)$.
 	Finally, it outputs the ciphertext $C = (capsule, encData)$.
 	
 	\item $\mathsf{Decrypt}(sk_A, C)$: On input the secret key $sk_A$ and a ciphertext $C = (capsule, encData)$, the decryption algorithm $\mathsf{Decrypt}$ computes the key $K = \mathsf{Decapsulate}(sk_A, capsule)$, and decrypts ciphertext $encData$ using the decryption function of the authenticated encryption algorithm $\mathsf{AEnc}$ to obtain message $M$ if decryption is correct, and $\perp$ otherwise. Finally, it outputs message $M$ (or $\perp$ if decryption was invalid).
-
 	
-	\item $\mathsf{DecryptFrags}(sk_B, \{cFrag_i\}_{i=1}^t, encData)$: On input the secret key $sk_B$, a set of $t$ capsule fragments, each of them labeled as $cFrag_i$, and the encrypted data $encData$, the fragments decryption algorithm $\mathsf{DecryptFrags}$ first computes 
+	\item $\mathsf{ReEncrypt}(kFrag, C)$: On input a re-encryption key fragment $kFrag$ and a ciphertext $C = (capsule, encData)$, the re-encryption algorithm $\mathsf{ReEncrypt}$ applies $\mathsf{ReEncapsulate}$ to the $capsule$ to obtain a $cFrag$, and outputs the re-encrypted ciphertext $C' = (cFrag, encData)$.
 	
-%		\begin{enumerate}
-%\item Compute $ d = H_3(X_A, pk_B, X_A^b)$. Recall that $d$ is the result of a non-interactive Diffie-Hellman key exchange between $B$'s keypair and the ephemeral key pair $(x_A, X_A)$. 
-%\item omputes $E = g^r$ and $V = g^u$. 
-%	Next, it computes the value $s = u + r \cdot H_2(E, V)$. 
-%	The derived key is computed as $K = \mathsf{KDF}((pk_A)^{r + u})$. 
-%
-%
-%
-%\end{enumerate}
+	\item $\mathsf{DecryptFrags}(sk_B, \{C'_i\}_{i=1}^t)$: On input the secret key $sk_B$, a set of $t$ re-encrypted ciphertexts $C'_i = (cFrag_i, encData)$, the fragments decryption algorithm $\mathsf{DecryptFrags}$ first decapsulates the $cFrags$ with $\mathsf{DecapsulateFrags}(sk_B, \{cFrag_i\}_{i=1}^t)$ to produce key $K$, and decrypts ciphertext $encData$ using the decryption function of the authenticated encryption algorithm $\mathsf{AEnc}$ to obtain message $M$ if decryption is correct, and $\perp$ otherwise. Finally, it outputs message $M$ (or $\perp$ if decryption was invalid).	Note that the symmetric ciphertext $encData$ is the same for all the $C'_i$ that are re-encryptions of the same ciphertext $C$. 
 	
-%	$capsule' = \mathsf{Combine}(\{cFrag_i\}_{i=1}^t)$. With this result, it returns the output of $\mathsf{Decrypt}(sk_A, C')$, where $C' = (encKey', encData)$.
 \end{itemize}
 	
 
