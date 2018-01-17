@@ -195,7 +195,7 @@ For simplicity, we will omit the public parameters from the rest of the function
     \begin{enumerate}
     \item Sample random $y, id \in \mathbb Z_q$ and compute $Y = g^y$ and $rk = f(id)$
     \item Compute $U_1 = U^{rk}$
-    \item Compute $z_1 = H_4(X_A, U_1, Y, id)$, and $z_2 = y - a \cdot z_1$
+    \item Compute $z_1 = H_4(Y, id, pk_A, pk_B, U_1, X_A)$, and $z_2 = y - a \cdot z_1$
     \item Define a re-encryption key fragment $kFrag$ as the tuple $(id, rk, X_A, U_1, z_1, z_2)$
     \item $KF = KF \cup \{kFrag\}$
 	\end{enumerate}
