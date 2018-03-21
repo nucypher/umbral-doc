@@ -34,7 +34,7 @@
 This document describes the Umbral proxy re-encryption scheme, as used by NuCypher KMS \cite{egorov2017nucypherkms}. 
 Umbral is a threshold proxy re-encryption scheme following a Key Encapsulation Mechanism (KEM) approach. It is inspired by ECIES-KEM \cite{ansi-x9.63}, and the BBS98 proxy re-encryption scheme \cite{blaze1998divertible}. 
 With Umbral, Alice (which in the generic name for data owners in NuCypher KMS) can delegate decryption rights to Bob for any ciphertext intended to her, through a re-encryption process performed by a set of $N$ semi-trusted proxies. When at least $t$ of these proxies (out of $N$) participate by performing re-encryption, Bob is able to combine these independent re-encryptions and decrypt the original message using his private key. 
-The name ``Umbral'' comes from the Spanish word for ``threshold'', emphasizing this characteristic of the scheme, given its central role in the NuCypher KMS architecture. 
+The name ``Umbral'' comes from the Spanish word for ``threshold'', emphasizing this characteristic of the scheme, given its central role in the decentralized architecture of NuCypher KMS. 
 \end{abstract}
 
 %\tableofcontents
@@ -188,15 +188,15 @@ For simplicity, we will omit the public parameters from the rest of the function
 	\begin{enumerate}
 \item Sample random $x_A \in \mathbb Z_q$ and compute $X_A = g^{x_A}$
 \item Compute $ d = H_3(X_A, pk_B, (pk_B)^{x_A})$. Note how $d$ is the result of a non-interactive Diffie-Hellman key exchange between $B$'s keypair and the ephemeral key pair $(x_A, X_A)$. We will use this shared secret to make the re-encryption key generation of the scheme non-interactive.
-\item Sample random $t-1$ elements $f_i\in \mathbb Z_q$, with $1 \leq i \leq t-1$, and  compute $f_0 = a \cdot b^{-1} \bmod q$.
+\item Sample random $t-1$ elements $f_i\in \mathbb Z_q$, with $1 \leq i \leq t-1$, and  compute $f_0 = a \cdot d^{-1} \bmod q$.
 \item Construct a polynomial $f(x) \in \mathbb Z_q[x]$ of degree $t-1$, such that $f(x) = f_0 + f_1x + f_2x^2 + ... + f_{t-1}x^{t-1}$.  
 \item Initialize set $KF = \emptyset$ and repeat $N$ times:
 
     \begin{enumerate}
-    \item Sample random $y, id \in \mathbb Z_q$ and compute $Y = g^y$ and $rk = f(id)$
-    \item Compute $U_1 = U^{rk}$
-    \item Compute $z_1 = H_4(Y, id, pk_A, pk_B, U_1, X_A)$, and $z_2 = y - a \cdot z_1$
-    \item Define a re-encryption key fragment $kFrag$ as the tuple $(id, rk, X_A, U_1, z_1, z_2)$
+    \item Sample random $y, id \in \mathbb Z_q$ and compute $rk = f(id)$ and $Y = g^y$.
+    \item Compute $U_1 = U^{rk}$.
+    \item Compute $z_1 = H_4(Y, id, pk_A, pk_B, U_1, X_A)$, and $z_2 = y - a \cdot z_1$.
+    \item Define a re-encryption key fragment $kFrag$ as the tuple $(id, rk, X_A, U_1, z_1, z_2)$.
     \item $KF = KF \cup \{kFrag\}$
 	\end{enumerate}
 
