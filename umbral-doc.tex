@@ -47,7 +47,7 @@ It uses proxy re-encryption to delegate decryption rights, enabling this way the
 
 Umbral is a threshold proxy re-encryption scheme loosely inspired by ECIES-KEM \cite{ansi-x9.63} (since the Umbral KEM is constructed similarly as in ECIES) and the BBS98 proxy re-encryption scheme \cite{blaze1998divertible}, although with several improvements to make it non-interactive, unidirectional, and most importantly, verifiable with respect to re-encryption. Finally, the threshold functionality of Umbral reuses ideas from Shamir's Secret Sharing \cite{shamir1979share}, although applied to the context of proxy re-encryption. 
 
-We provide a reference implementation in \cite{umbral-github}, instantiated over an elliptic curve group.
+We provide a reference implementation in \cite{pyumbral}, instantiated over an elliptic curve group.
 
 %With respect to the former, Umbral ciphertexts have ``almost'' the same form than ECIES ciphertexts: in both cases, they are composed of an encoded EC point used as ephemeral public key, an encrypted payload using a symmetric encryption algorithm and a MAC code. We say ``almost'' because we introduce some differences that are not supported by the various ECIES specifications; in any case, compliance with ECIES specifications is not one of our goals. 
 %
@@ -63,7 +63,7 @@ Although the additive notation is the norm when dealing with elliptic curve cryp
 
 \subsection{A brief introduction to Proxy Re-Encryption}
 
-(TODO: General description of proxy re-encryption, properties, etc)
+%(TODO: General description of proxy re-encryption, properties, etc)
 
 Proxy re-encryption is a special type of public-key encryption that permits a proxy to transform ciphertexts from one public key to another, without the proxy being able to learn any information about the original message; to do so, the proxy must be in possession of a \emph{re-encryption key} that enables this process \cite{nunez2017proxy}. Thus, it serves as a means for delegating decryption rights, opening up many possible applications that require of delegated access to encrypted data. In the PRE literature, the parties involved are usually labeled in terms of a relationship of delegation, namely: %. A typical proxy re-encryption environment involves at least three parties:
 \begin{itemize}
@@ -74,7 +74,7 @@ Proxy re-encryption is a special type of public-key encryption that permits a pr
 
 \begin{figure}%[h]
 \centering
-\includegraphics[width=0.75\textwidth]{pre.pdf}
+\includegraphics[width=0.75\textwidth]{figures/pre.pdf}
 \caption{Main actors and interactions in a PRE environment}
 \label{fig:pre-actores}
 \end{figure}
@@ -128,7 +128,7 @@ In this section we will first describe the syntax of the Umbral KEM; next, we pr
 
 \begin{figure}%[h]
 \centering
-\includegraphics[width=\textwidth]{umbral-kem-flow.pdf}
+\includegraphics[width=\textwidth]{figures/umbral-kem-flow.pdf}
 \caption{Main operation of Umbral KEM. Operations are shown in yellow, cryptographic keys in gray, and data in white}
 \label{fig:umbral-kem}
 \end{figure}
@@ -267,9 +267,9 @@ Extending Umbral KEM with a DEM results in a full-fledged proxy re-encryption sc
 \subsection{Parameters of Umbral instantiation in NuCypher KMS}
 The only restriction that the Umbral cryptosystem imposes on the choice of EC curve is that it should generate a group of prime order, since we need to compute inverses modulo the order of this group. In our current setting, we use the secp256k1 curve, since it fulfills this latter requirement; we are exploring other curve choices that could improve performance. 
 
-As per the authenticated encryption scheme, we use PyNaCl's SecretBox implementation, which in turn uses Salsa20-Poly1305.
+As per the authenticated encryption scheme, we use PyNaCl's SecretBox implementation, which in turn uses Chacha20-Poly1305.
 
-For the KDF, we use HKDF with SHA-512 as hash function. 
+For the KDF, we use HKDF with BLAKE2b as hash function. 
 
 \bibliographystyle{unsrt}       % APS-like style for physics
 \bibliography{umbral-doc}
