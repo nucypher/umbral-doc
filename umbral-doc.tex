@@ -7,7 +7,13 @@
 \usepackage[utf8]{inputenc}
 \usepackage{url}
 \usepackage{graphicx}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}
+\renewcommand{\algorithmicensure}{\textbf{Output:}}
 
+\newcommand{\pyumbral}{\textsf{pyUmbral}}
+\newcommand{\secp}{\textsf{secp256k1}}
 
 \newcommand{\rk}[2]{rk_{#1\rightarrow#2}}
 \providecommand{\pk}[1]{pk_{#1}}
@@ -166,7 +172,7 @@ The following is a description of the basic functions provided by Umbral KEM. Fo
 
 \subsection{The Umbral KEM construction}
 
-\subsubsection{Setup and public parameters}
+\subsubsection{Setup and public parameters}\label{sec:setup_umbral}
 
 \begin{itemize}
 
@@ -190,10 +196,13 @@ For simplicity, we will omit the public parameters from the rest of the function
 \item Compute $ d = H_3(X_A, pk_B, (pk_B)^{x_A})$. Note how $d$ is the result of a non-interactive Diffie-Hellman key exchange between $B$'s keypair and the ephemeral key pair $(x_A, X_A)$. We will use this shared secret to make the re-encryption key generation of the scheme non-interactive.
 \item Sample random $t-1$ elements $f_i\in \mathbb Z_q$, with $1 \leq i \leq t-1$, and  compute $f_0 = a \cdot d^{-1} \bmod q$.
 \item Construct a polynomial $f(x) \in \mathbb Z_q[x]$ of degree $t-1$, such that $f(x) = f_0 + f_1x + f_2x^2 + ... + f_{t-1}x^{t-1}$.  
+\item Compute $ D = H_6(pk_A, pk_B, pk_B^a)$
 \item Initialize set $KF = \emptyset$ and repeat $N$ times:
 
     \begin{enumerate}
-    \item Sample random $y, id \in \mathbb Z_q$ and compute $rk = f(id)$ and $Y = g^y$.
+    \item Sample random $y, id \in \mathbb Z_q$
+    \item Compute $s_x = H_5(id, D)$ and $Y = g^y$.
+    \item Compute $rk = f(s_x)$ 
     \item Compute $U_1 = U^{rk}$.
     \item Compute $z_1 = H_4(Y, id, pk_A, pk_B, U_1, X_A)$, and $z_2 = y - a \cdot z_1$.
     \item Define a re-encryption key fragment $kFrag$ as the tuple $(id, rk, X_A, U_1, z_1, z_2)$.
@@ -219,15 +228,17 @@ For simplicity, we will omit the public parameters from the rest of the function
 	
 	\item $\mathsf{Decapsulate}(sk_A, capsule)$: On input the secret key $sk_A = a$, and an original $capsule = (E,V,s)$, the decapsulation algorithm $\mathsf{Decapsulate}$ first checks the validity of the capsule with $\mathsf{CheckCapsule}$ and outputs $\perp$ if the check fails. Otherwise, it computes $K = \mathsf{KDF}((E\cdot V)^{a})$. Finally, it outputs $K$.
 	
-	\item $\mathsf{DecapsulateFrags}(sk_B, \{cFrag_i\}_{i=1}^t)$: On input the secret key $sk_B = b$, and a set of $t$ capsule fragments, being each of them $cFrag_i = (E_{1,i}, V_{1,i}, id_i, X_A)$. Note that the value $X_A$ is the same for all the $cFrags$ that are produced by re-encryptions using a $kFrag$ in the set of re-encryption key fragments $KF$. 
+	\item $\mathsf{DecapsulateFrags}(sk_B, pk_A, \{cFrag_i\}_{i=1}^t)$: On input the secret key $sk_B = b$, the original public key $pk_A = g^a$, and a set of $t$ capsule fragments, being each of them $cFrag_i = (E_{1,i}, V_{1,i}, id_i, X_A)$, the fragments decapsulation algorithm $\mathsf{DecapsulateFrag}$ does the following:
 	
 	\begin{enumerate}
-    \item Let $I = \{id_i\}_{i=1}^t$. For all $id_i\in I$, compute $\lambda_{i, I} = \prod\limits_{j=1, j\neq i}^{t} \frac{id_j}{id_j-id_i}$
+	\item Compute $ D = H_6(pk_A, pk_B, pk_A^b)$
+    \item Let $S = \{s_{x,i}\}_{i=1}^t$, for $s_{x,i} = H_5(id_i, D)$. For all $s_{x,i}\in S$, compute:
+    \[\lambda_{i, S} = \prod\limits_{j=1, j\neq i}^{t} \frac{s_{x,j}}{s_{x,j}-s_{x,i}}\]
     \item Compute the values:
-     	$$E' = \prod\limits_{i=1}^{t} (E_{1,i})^{\lambda_{i, I}}	
+     	$$E' = \prod\limits_{i=1}^{t} (E_{1,i})^{\lambda_{i, S}}	
 		\qquad
-		V' = \prod\limits_{i=1}^{t} (V_{1,i})^{\lambda_{i, I}}$$
-	\item Compute $d = H_3(X_A, pk_B, X_A^b)$. Recall that $d$ is the result of a non-interactive Diffie-Hellman key exchange between $B$'s keypair and the ephemeral key pair $(x_A, X_A)$. 
+		V' = \prod\limits_{i=1}^{t} (V_{1,i})^{\lambda_{i, S}}$$
+	\item Compute $d = H_3(X_A, pk_B, X_A^b)$. Recall that $d$ is the result of a non-interactive Diffie-Hellman key exchange between $B$'s keypair and the ephemeral key pair $(x_A, X_A)$. Note also that the value $X_A$ is the same for all the $cFrags$ that are produced by re-encryptions using a $kFrag$ in the set of re-encryption key fragments $KF$. 
 	\item Finally, output the symmetric key $K= \mathsf{KDF}((E'\cdot V')^{d})$. 
 	\end{enumerate}
 \end{itemize}
@@ -246,30 +257,64 @@ For simplicity, we will omit the public parameters from the rest of the function
 
 \subsection{The KEM/DEM construction}
 
-Extending Umbral KEM with a DEM results in a full-fledged proxy re-encryption scheme. As such, this defines encryption and decryption algorithms, rather than encapsulation and decapsulations. Note how the re-encryption algorithm actually does not involve any symmetric encryption operation. We omit the key generation algorithms since they are not changed in the extension. 
+Extending Umbral KEM with a DEM results in a full-fledged proxy re-encryption scheme. As such, this defines encryption and decryption algorithms, rather than encapsulation and decapsulations. We require the DEM to be an authenticated encryption with associated data algorithm, which we will denote as $\mathsf{AEAD}$. Note also how the re-encryption algorithm actually does not involve any symmetric encryption operation. We omit the key generation algorithms since they are not changed in the extension. 
 
 \begin{itemize}
 	
-	\item $\mathsf{Encrypt}(pk_A, M)$: On input the public key $pk_A$ and a message $M\in\mathcal{M}$, the encryption algorithm $\mathsf{Encrypt}$ first computes $(K, capsule) = \mathsf{Encapsulate}(pk_A)$.
-	$encData$ is the result of applying the authenticated encryption algorithm $\mathsf{AEnc}$ to $M$ with key $K$. 
+	\item $\mathsf{Encrypt}(pk_A, M)$: On input the public key $pk_A$ and a message $M\in\mathcal{M}$, the encryption algorithm $\mathsf{Encrypt}$ first computes $(K, capsule) = \mathsf{Encapsulate}(pk_A)$. 
+	$encData$ is the result of applying $\mathsf{AEAD}$ to $M$ with key $K$, with $capsule$ as associated data. 
 	Finally, it outputs the ciphertext $C = (capsule, encData)$.
 	
-	\item $\mathsf{Decrypt}(sk_A, C)$: On input the secret key $sk_A$ and a ciphertext $C = (capsule, encData)$, the decryption algorithm $\mathsf{Decrypt}$ computes the key $K = \mathsf{Decapsulate}(sk_A, capsule)$, and decrypts ciphertext $encData$ using the decryption function of the authenticated encryption algorithm $\mathsf{AEnc}$ to obtain message $M$ if decryption is correct, and $\perp$ otherwise. Finally, it outputs message $M$ (or $\perp$ if decryption was invalid).
+	\item $\mathsf{Decrypt}(sk_A, C)$: On input the secret key $sk_A$ and a ciphertext $C = (capsule, encData)$, the decryption algorithm $\mathsf{Decrypt}$ computes the key $K = \mathsf{Decapsulate}(sk_A, capsule)$, and decrypts ciphertext $encData$ using the decryption function of $\mathsf{AEAD}$ with key $K$ and $capsule$ as associated data, which results in message $M$ if decryption is correct, and $\perp$ otherwise. Finally, it outputs message $M$ (or $\perp$ if decryption was invalid).
 	
 	\item $\mathsf{ReEncrypt}(kFrag, C)$: On input a re-encryption key fragment $kFrag$ and a ciphertext $C = (capsule, encData)$, the re-encryption algorithm $\mathsf{ReEncrypt}$ applies $\mathsf{ReEncapsulate}$ to the $capsule$ to obtain a $cFrag$, and outputs the re-encrypted ciphertext $C' = (cFrag, encData)$.
 	
-	\item $\mathsf{DecryptFrags}(sk_B, \{C'_i\}_{i=1}^t)$: On input the secret key $sk_B$, a set of $t$ re-encrypted ciphertexts $C'_i = (cFrag_i, encData)$, the fragments decryption algorithm $\mathsf{DecryptFrags}$ first decapsulates the $cFrags$ with $\mathsf{DecapsulateFrags}(sk_B, \{cFrag_i\}_{i=1}^t)$ to produce key $K$, and decrypts ciphertext $encData$ using the decryption function of the authenticated encryption algorithm $\mathsf{AEnc}$ to obtain message $M$ if decryption is correct, and $\perp$ otherwise. Finally, it outputs message $M$ (or $\perp$ if decryption was invalid).	Note that the symmetric ciphertext $encData$ is the same for all the $C'_i$ that are re-encryptions of the same ciphertext $C$. 
+	\item $\mathsf{DecryptFrags}(sk_B, \{C'_i\}_{i=1}^t)$: On input the secret key $sk_B$, a set of $t$ re-encrypted ciphertexts $C'_i = (cFrag_i, encData)$, the fragments decryption algorithm $\mathsf{DecryptFrags}$ first decapsulates the $cFrags$ with $\mathsf{DecapsulateFrags}(sk_B, \{cFrag_i\}_{i=1}^t)$ to produce key $K$, and decrypts ciphertext $encData$ using the decryption function of $\mathsf{AEAD}$ with key $K$ and $capsule$ as associated data, which results in message $M$ if decryption is correct, and $\perp$ otherwise. Finally, it outputs message $M$ (or $\perp$ if decryption was invalid).	Note that the symmetric ciphertext $encData$ is the same for all the $C'_i$ that are re-encryptions of the same ciphertext $C$. 
 	
 \end{itemize}
 	
 
 
-\subsection{Parameters of Umbral instantiation in NuCypher KMS}
-The only restriction that the Umbral cryptosystem imposes on the choice of EC curve is that it should generate a group of prime order, since we need to compute inverses modulo the order of this group. In our current setting, we use the secp256k1 curve, since it fulfills this latter requirement; we are exploring other curve choices that could improve performance. 
+\section{Notes concerning Umbral reference implementation (\textsf{pyUmbral})}
 
+\subsection{Choice of elliptic curve}
+The only restriction that the Umbral cryptosystem imposes on the choice of EC curve is that it should generate a group of prime order, since we need to compute inverses modulo the order of this group. In our current setting, we use the \textsf{secp256k1} curve since it fulfills this latter requirement and it is widely used in the blockchain ecosystem; we are exploring other curve choices that could improve performance. 
+
+\subsection{Hash functions}
+As described in Section~\ref{sec:setup_umbral}, Umbral requires several hash functions, namely $H_2: \mathbb G^2 \to \mathbb Z_q$, $H_3: \mathbb G^3 \to \mathbb Z_q$, and $H_4: \mathbb G^3 \times Z_q \to \mathbb Z_q$, which behave as random oracles. Since for elements of both $\mathbb G$ and $\mathbb Z_q$ there exists efficient encodings to bit string (i.e., compressed representation in the case EC points and ), in \textsf{pyUmbral} we implement $H_2, H_3$ and $H_4$ from a common hash function $H': \{0,1\}^* \to \mathbb Z_q$. For example, for the case of $H_2$, we define it as $H_2(g_1, g_2) = H'(\mathsf{encode}(g_1)||\mathsf{encode}(g_2))$.
+
+This reduces the problem to the definition of $H'$. Let $n$ be the order of the group induced by the curve in use, and $d$ the size in bits of an internal hash function (e.g., \textsf{BLAKE2b}). Algorithm~\ref{alg:hash_to_bn} describes how to compute $H'$. 
+
+
+\begin{algorithm} % enter the algorithm environment
+\caption{Pseudocode for $H'$ (\texttt{hash\_to\_bn} in \pyumbral)} % give the algorithm a caption
+\label{alg:hash_to_bn} % and a label for \ref{} commands later in the document
+\begin{algorithmic} % enter the algorithmic environment
+	\REQUIRE $X$ is a bit string of arbitrary size
+    \STATE $i \Leftarrow 0$
+	\REPEAT
+		\STATE $r \Leftarrow \mathsf{int}(\mathsf{digest}(X||\mathsf{encode}(i))) \bmod n$
+		\STATE $i \Leftarrow i + 1$
+	\UNTIL{$r > 2^d \bmod n$}
+	\RETURN $r$
+\end{algorithmic}
+\end{algorithm}
+
+For reference, in the case of curve \secp~and a 64-bytes digest ($d=512$):
+\begin{align*} 
+n &= \mathtt{0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141} \\ 
+2^d \bmod n &= \mathtt{0x9d671cd581c69bc5e697f5e45bcd07c6741496c20e7cf878896cf21467d7d140}
+\end{align*}
+
+\subsection{Symmetric encryption}
 As per the authenticated encryption scheme, we use PyNaCl's SecretBox implementation, which in turn uses Chacha20-Poly1305.
 
-For the KDF, we use HKDF with BLAKE2b as hash function. 
+\subsection{Key derivation}
+For the KDF, we use \textsf{HKDF} with \textsf{BLAKE2b} as hash function, with a digest size of 64 bytes. 
+
+%\subsection{Nothing-up-my-sleeve generation of public parameters}
+%Umbral requires a group element $U$ that is used as another generator. In order to 
+
 
 \bibliographystyle{unsrt}       % APS-like style for physics
 \bibliography{umbral-doc}
