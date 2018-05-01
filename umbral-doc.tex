@@ -69,14 +69,12 @@ Although the additive notation is the norm when dealing with elliptic curve cryp
 
 \subsection{A brief introduction to Proxy Re-Encryption}
 
-%(TODO: General description of proxy re-encryption, properties, etc)
-
 Proxy re-encryption is a special type of public-key encryption that permits a proxy to transform ciphertexts from one public key to another, without the proxy being able to learn any information about the original message; to do so, the proxy must be in possession of a \emph{re-encryption key} that enables this process \cite{nunez2017proxy}. Thus, it serves as a means for delegating decryption rights, opening up many possible applications that require of delegated access to encrypted data. In the PRE literature, the parties involved are usually labeled in terms of a relationship of delegation, namely: %. A typical proxy re-encryption environment involves at least three parties:
-\begin{itemize}
-\item Delegator: This actor is the one that \emph{delegates} his decryption rights using proxy re-encryption. In order to do this he creates a re-encryption key, which he sends to the proxy. We usually refer to the delegator as ``Alice''.
-\item Delegatee: The delegatee is granted a delegated right to decrypt ciphertexts that, although were not intended for him in the first place, where re-encrypted for him with permission from the original recipient (i.e., the delegator). This actor usually takes the name ``Bob''.
-\item Proxy: It handles the re-encryption process that transforms ciphertexts under the delegator's public key into ciphertexts that the delegatee can decrypt using his private key. The proxy uses the re-encryption key during this process, and does not learn any additional information. 
-\end{itemize}
+\begin{description}
+\item[Delegator] This actor is the one that \emph{delegates} his decryption rights using proxy re-encryption. In order to do this he creates a re-encryption key, which he sends to the proxy. We usually refer to the delegator as ``Alice''.
+\item[Delegatee] The delegatee is granted a delegated right to decrypt ciphertexts that, although were not intended for him in the first place, where re-encrypted for him with permission from the original recipient (i.e., the delegator). This actor usually takes the name ``Bob''.
+\item[Proxy] It handles the re-encryption process that transforms ciphertexts under the delegator's public key into ciphertexts that the delegatee can decrypt using his private key. The proxy uses the re-encryption key during this process, and does not learn any additional information. 
+\end{description}
 
 \begin{figure}%[h]
 \centering
@@ -88,6 +86,15 @@ Proxy re-encryption is a special type of public-key encryption that permits a pr
 Figure~\ref{fig:pre-actores} depicts the main actors in a PRE environment and their interactions. Since PRE is a special type of PKE, users also have a pair of public and private keys, as shown in the figure. Hence, anyone that knows a public key is capable of producing ciphertexts intended for the corresponding recipient; conversely, these ciphertexts can only be decrypted using the corresponding decryption key. 
 The distinctive aspect is that ciphertexts can be re-encrypted in order to be decrypted by a different private key than the one originally intended. 
 
+This definition is oblivious to the specific properties of PRE schemes \cite{nunez2015parametric} 
+
+\begin{description}
+\item[Directionality] A PRE scheme is \emph{unidirectional} if the re-encryption keys enable the transformation of ciphertexts only in one direction, from delegator to delegatee, and is \emph{bidirectional} otherwise. 
+\item[Number of hops] We say a PRE scheme is \emph{single-hop} (or \emph{single-use}) if a re-encrypted ciphertext cannot be re-encrypted again, while it is \emph{multi-hop} (or \emph{multu-use})  if ciphertexts are re-encryptable multiple times. 
+\item[Interactivity] If the secret key of the delegatee is not needed in the re-encryption key generation process, then the scheme is \emph{not interactive} (i.e., since he does not have to participate in the process). Otherwise, we say it is \emph{interactive}. 
+\end{description}
+
+See \cite[Section 3.3]{nunez2017proxy} for a more detailed description of these and other PRE properties. 
 
 
 %\subsection{ECIES}
