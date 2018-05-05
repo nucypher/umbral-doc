@@ -333,7 +333,7 @@ U^{\rho} &\stackrel{?}{=} U_2 \cdot U_1^h
 The only restriction that the Umbral cryptosystem imposes on the choice of EC curve is that it should generate a group of prime order, since we need to compute inverses modulo the order of this group. In our current setting, we use the \textsf{secp256k1} curve since it fulfills this latter requirement and it is widely used in the blockchain ecosystem; we are exploring other curve choices that could improve performance. 
 
 \subsection{Hash functions}
-As described in Section~\ref{sec:setup_umbral}, Umbral requires several hash functions, namely $H_2: \mathbb G^2 \to \mathbb Z_q$, $H_3: \mathbb G^3 \to \mathbb Z_q$, and $H_4: \mathbb G^3 \times Z_q \to \mathbb Z_q$, which behave as random oracles. Since for elements of both $\mathbb G$ and $\mathbb Z_q$ there exists efficient encodings to bit string (i.e., compressed representation in the case EC points and ), in \textsf{pyUmbral} we implement $H_2, H_3$ and $H_4$ from a common hash function $H': \{0,1\}^* \to \mathbb Z_q$. For example, for the case of $H_2$, we can define it as $H_2(g_1, g_2) = H'(\mathsf{encode}(g_1)||\mathsf{encode}(g_2))$.
+As described in Section~\ref{sec:setup_umbral}, Umbral requires several hash functions, such as $H_2: \mathbb G^2 \to \mathbb Z_q$, $H_3: \mathbb G^3 \to \mathbb Z_q$, and $H_4: \mathbb G^3 \times Z_q \to \mathbb Z_q$, which behave as random oracles that output an element of $\mathbb Z_q$. Since for elements of both $\mathbb G$ and $\mathbb Z_q$ there exists efficient encodings to bit string (e.g., compressed representation in the case EC points), in \textsf{pyUmbral} we implement these hash functions from a common hash function $H': \{0,1\}^* \to \mathbb Z_q$. For example, for the case of $H_2$, we can define it as $H_2(g_1, g_2) = H'(\mathsf{encode}(g_1)||\mathsf{encode}(g_2))$.
 
 This reduces the problem to the definition of $H'$. Let $n$ be the order of the group induced by the curve in use, $X$ a byte string of arbitrary size, and $\mathsf{digest}$ a cryptographic hash function with a digest size $> 64 + \log_2(n)$  (e.g., for a 256-bit curve, we use \textsf{BLAKE2b} with a digest size of 512 bits). The output $h_X$ of $H'(X)$ is computed as:
 $$h_X \Leftarrow 1 + \mathsf{int}(\mathsf{digest}(X)) \bmod (n-1)$$
@@ -341,7 +341,7 @@ $$h_X \Leftarrow 1 + \mathsf{int}(\mathsf{digest}(X)) \bmod (n-1)$$
 In \pyumbral, this is implemented by the class method \texttt{CurveBN.hash()}. 
 For reference, in the case of curve \secp~and BLAKE2b with a digest size of 512-bits:
 \begin{align*} 
-X &= &\mathtt{616263}\\
+X &= &\mathtt{616263} \text{\quad(ASCII string ``\textit{abc}'')}\\
 n &= &\mathtt{fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141} \\ 
 \mathsf{digest}(X) &=  &\mathtt{ba80a53f981c4d0d6a2797b69f12f6e94c212f14685ac4b74b12bb6fdbffa2d1}\\
  & &\mathtt{7d87c5392aab792dc252d5de4533cc9518d38aa8dbf1925ab92386edd4009923}\\
