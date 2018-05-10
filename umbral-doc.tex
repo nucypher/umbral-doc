@@ -39,7 +39,7 @@
 \begin{abstract}
 This document describes the Umbral proxy re-encryption scheme, as used by NuCypher KMS \cite{egorov2017nucypherkms}. 
 Umbral is a threshold proxy re-encryption scheme following a Key Encapsulation Mechanism (KEM) approach. It is inspired by ECIES-KEM \cite{ansi-x9.63}, and the BBS98 proxy re-encryption scheme \cite{blaze1998divertible}. 
-With Umbral, Alice (which in the generic name for data owners in NuCypher KMS) can delegate decryption rights to Bob for any ciphertext intended to her, through a re-encryption process performed by a set of $N$ semi-trusted proxies. When at least $t$ of these proxies (out of $N$) participate by performing re-encryption, Bob is able to combine these independent re-encryptions and decrypt the original message using his private key. 
+With Umbral, Alice (which in the generic name for data owners in NuCypher KMS) can delegate decryption rights to Bob for any ciphertext intended to her, through a re-encryption process performed by a set of $N$ semi-trusted proxies. When at least $m$ of these proxies (out of $N$) participate by performing re-encryption, Bob is able to combine these independent re-encryptions and decrypt the original message using his private key. 
 The name ``Umbral'' comes from the Spanish word for ``threshold'', emphasizing this characteristic of the scheme, given its central role in the decentralized architecture of NuCypher KMS. 
 \end{abstract}
 
@@ -155,7 +155,7 @@ The following is a description of the basic functions provided by Umbral KEM. Fo
 \begin{itemize}
 
 	\item $\mathsf{KeyGen}()$: The key generation algorithm $\mathsf{KeyGen}$ outputs a pair of public and secret keys $(\pk{A}, \sk{A})$.
-	\item $\mathsf{ReKeyGen}(sk_A, pk_B, N, t)$: On input the secret key $sk_{A} = a$, the public key of the intended delegatee $pk_{B} = g^b$, a number of fragments $N$, and a threshold $t$, the re-encryption key generation algorithm $\mathsf{ReKeyGen}$ computes $N$ fragments of the re-encryption key between $A$ and $B$, each of them named $kFrag$. 
+	\item $\mathsf{ReKeyGen}(sk_A, pk_B, N, t)$: On input the secret key $sk_{A} = a$, the public key of the intended delegatee $pk_{B} = g^b$, a number of fragments $N$, and a threshold $m$, the re-encryption key generation algorithm $\mathsf{ReKeyGen}$ computes $N$ fragments of the re-encryption key between $A$ and $B$, each of them named $kFrag$. 
 \end{itemize}
 
 
@@ -174,7 +174,7 @@ The following is a description of the basic functions provided by Umbral KEM. Fo
 \begin{itemize}
 \item $\mathsf{ReEncapsulation}(kFrag, capsule)$: On input a re-encryption key fragment $kFrag$, and a $capsule$, the re-encapsulation algorithm $\mathsf{ReEncapsulation}$ outputs the capsule fragment $cFrag$, or $\perp$ if the the process fails.
 
-	\item $\mathsf{DecapsulateFrags}(sk_B, \{cFrag_i\}_{i=1}^t, capsule)$: On input the secret key $sk_B$, and a set of $t$ capsule fragments or $cFrags$, the fragments decapsulation algorithm outputs the symmetric key $K$, or $\perp$ if the decryption fails. 
+	\item $\mathsf{DecapsulateFrags}(sk_B, \{cFrag_i\}_{i=1}^m, capsule)$: On input the secret key $sk_B$, and a set of $m$ capsule fragments or $cFrags$, the fragments decapsulation algorithm outputs the symmetric key $K$, or $\perp$ if the decryption fails. 
 
 \end{itemize}
 
@@ -197,13 +197,13 @@ For simplicity, we will omit the public parameters from the rest of the function
 	%\item $\mathsf{Setup}(1^k)\rightarrow params$. On input the security parameter $1^k$, the global setup algorithm $\mathsf{Setup}$ outputs the global parameters $params$.
 	\item $\mathsf{KeyGen}()$: Sample $a \in \mathbb Z_q$ uniformly at random, compute $g^a$ and output the keypair $(pk, sk) = (g^a, a)$.
 
-	\item $\mathsf{ReKeyGen}(sk_A, pk_B, N, t)$: On input the secret key $sk_{A} = a$, the public key of the intended delegatee $pk_{B} = g^b$, a number of fragments $N$, and a threshold $t$, the re-encryption key generation algorithm $\mathsf{ReKeyGen}$ computes $N$ fragments of the re-encryption key between $A$ and $B$ as follows:
+	\item $\mathsf{ReKeyGen}(sk_A, pk_B, N, m)$: On input the secret key $sk_{A} = a$, the public key of the intended delegatee $pk_{B} = g^b$, a number of fragments $N$, and a threshold $m$, the re-encryption key generation algorithm $\mathsf{ReKeyGen}$ computes $N$ fragments of the re-encryption key between $A$ and $B$ as follows:
 	
 	\begin{enumerate}
 \item Sample random $x_A \in \mathbb Z_q$ and compute $X_A = g^{x_A}$
 \item Compute $ d = H_3(X_A, pk_B, (pk_B)^{x_A})$. Note how $d$ is the result of a non-interactive Diffie-Hellman key exchange between $B$'s keypair and the ephemeral key pair $(x_A, X_A)$. We will use this shared secret to make the re-encryption key generation of the scheme non-interactive.
-\item Sample random $t-1$ elements $f_i\in \mathbb Z_q$, with $1 \leq i \leq t-1$, and  compute $f_0 = a \cdot d^{-1} \bmod q$.
-\item Construct a polynomial $f(x) \in \mathbb Z_q[x]$ of degree $t-1$, such that $f(x) = f_0 + f_1x + f_2x^2 + ... + f_{t-1}x^{t-1}$.  
+\item Sample random $m-1$ elements $f_i\in \mathbb Z_q$, with $1 \leq i \leq m-1$, and  compute $f_0 = a \cdot d^{-1} \bmod q$.
+\item Construct a polynomial $f(x) \in \mathbb Z_q[x]$ of degree $m-1$, such that $f(x) = f_0 + f_1x + f_2x^2 + ... + f_{m-1}x^{m-1}$.  
 \item Compute $ D = H_6(pk_A, pk_B, pk_B^a)$
 \item Initialize set $KF = \emptyset$ and repeat $N$ times:
 
@@ -243,16 +243,16 @@ For simplicity, we will omit the public parameters from the rest of the function
 \begin{itemize}
 \item $\mathsf{ReEncapsulate}(kFrag, capsule)$: On input a re-encryption key fragment $kFrag= (id, rk, X_A, U_1, z_1, z_2)$, and a $capsule = (E,V,s)$, the re-encapsulation algorithm $\mathsf{ReEncapsulate}$ first checks the validity of the capsule with $\mathsf{CheckCapsule}$ and outputs $\perp$ if the check fails. Otherwise, it computes $E_1 = E^{rk}$ and $V_1 = V^{rk}$, and outputs the capsule fragment $cFrag = (E_1, V_1, id, X_A)$. 
 
-\item $\mathsf{DecapsulateFrags}(sk_B, pk_A, \{cFrag_i\}_{i=1}^t)$: On input the secret key $sk_B = b$, the original public key $pk_A = g^a$, and a set of $t$ capsule fragments, being each of them $cFrag_i = (E_{1,i}, V_{1,i}, id_i, X_A)$, the fragments decapsulation algorithm $\mathsf{DecapsulateFrag}$ does the following:
+\item $\mathsf{DecapsulateFrags}(sk_B, pk_A, \{cFrag_i\}_{i=1}^m)$: On input the secret key $sk_B = b$, the original public key $pk_A = g^a$, and a set of $m$ capsule fragments, being each of them $cFrag_i = (E_{1,i}, V_{1,i}, id_i, X_A)$, the fragments decapsulation algorithm $\mathsf{DecapsulateFrag}$ does the following:
 	
 	\begin{enumerate}
 	\item Compute $ D = H_6(pk_A, pk_B, pk_A^b)$
-    \item Let $S = \{s_{x,i}\}_{i=1}^t$, for $s_{x,i} = H_5(id_i, D)$. For all $s_{x,i}\in S$, compute:
-    \[\lambda_{i, S} = \prod\limits_{j=1, j\neq i}^{t} \frac{s_{x,j}}{s_{x,j}-s_{x,i}}\]
+    \item Let $S = \{s_{x,i}\}_{i=1}^m$, for $s_{x,i} = H_5(id_i, D)$. For all $s_{x,i}\in S$, compute:
+    \[\lambda_{i, S} = \prod\limits_{j=1, j\neq i}^m \frac{s_{x,j}}{s_{x,j}-s_{x,i}}\]
     \item Compute the values:
-     	$$E' = \prod\limits_{i=1}^{t} (E_{1,i})^{\lambda_{i, S}}	
+     	$$E' = \prod\limits_{i=1}^{m} (E_{1,i})^{\lambda_{i, S}}	
 		\qquad
-		V' = \prod\limits_{i=1}^{t} (V_{1,i})^{\lambda_{i, S}}$$
+		V' = \prod\limits_{i=1}^{m} (V_{1,i})^{\lambda_{i, S}}$$
 	\item Compute $d = H_3(X_A, pk_B, X_A^b)$. Recall that $d$ is the result of a non-interactive Diffie-Hellman key exchange between $B$'s keypair and the ephemeral key pair $(x_A, X_A)$. Note also that the value $X_A$ is the same for all the $cFrags$ that are produced by re-encryptions using a $kFrag$ in the set of re-encryption key fragments $KF$. 
 	\item Finally, output the symmetric key $K= \mathsf{KDF}((E'\cdot V')^{d})$. 
 	\end{enumerate}
@@ -278,7 +278,7 @@ Extending Umbral KEM with a DEM results in a full-fledged proxy re-encryption sc
 	
 	\item $\mathsf{ReEncrypt}(kFrag, C)$: On input a re-encryption key fragment $kFrag$ and a ciphertext $C = (capsule, encData)$, the re-encryption algorithm $\mathsf{ReEncrypt}$ applies $\mathsf{ReEncapsulate}$ to the $capsule$ to obtain a $cFrag$, and outputs the re-encrypted ciphertext $C' = (cFrag, encData)$.
 	
-	\item $\mathsf{DecryptFrags}(sk_B, \{C'_i\}_{i=1}^t)$: On input the secret key $sk_B$, a set of $t$ re-encrypted ciphertexts $C'_i = (cFrag_i, encData)$, the fragments decryption algorithm $\mathsf{DecryptFrags}$ first decapsulates the $cFrags$ with $\mathsf{DecapsulateFrags}(sk_B, \{cFrag_i\}_{i=1}^t)$ to produce key $K$, and decrypts ciphertext $encData$ using the decryption function of $\mathsf{AEAD}$ with key $K$ and $capsule$ as associated data, which results in message $M$ if decryption is correct, and $\perp$ otherwise. Finally, it outputs message $M$ (or $\perp$ if decryption was invalid).	Note that the symmetric ciphertext $encData$ is the same for all the $C'_i$ that are re-encryptions of the same ciphertext $C$. 
+	\item $\mathsf{DecryptFrags}(sk_B, \{C'_i\}_{i=1}^m)$: On input the secret key $sk_B$, a set of $m$ re-encrypted ciphertexts $C'_i = (cFrag_i, encData)$, the fragments decryption algorithm $\mathsf{DecryptFrags}$ first decapsulates the $cFrags$ with $\mathsf{DecapsulateFrags}(sk_B, \{cFrag_i\}_{i=1}^m)$ to produce key $K$, and decrypts ciphertext $encData$ using the decryption function of $\mathsf{AEAD}$ with key $K$ and $capsule$ as associated data, which results in message $M$ if decryption is correct, and $\perp$ otherwise. Finally, it outputs message $M$ (or $\perp$ if decryption was invalid).	Note that the symmetric ciphertext $encData$ is the same for all the $C'_i$ that are re-encryptions of the same ciphertext $C$. 
 	
 \end{itemize}
 	
