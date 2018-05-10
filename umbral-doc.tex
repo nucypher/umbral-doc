@@ -20,7 +20,10 @@
 \providecommand{\sk}[1]{sk_{#1}}
 \newcommand{\etal}{\emph{et al.\ }}
 
+\renewcommand{\P}[1]{P_{#1}}
+
 \newcommand{\G}{\mathbb G}
+\newcommand{\Z}{\mathbb G}
 
 \title{Umbral: a threshold proxy re-encryption scheme}
 \author{David Nuñez}
@@ -184,8 +187,8 @@ The following is a description of the basic functions provided by Umbral KEM. Fo
 
 \begin{itemize}
 
-\item $\mathsf{Setup}(sec)$: The setup algorithm first determines a cyclic group $\mathbb G$ of prime order $q$, according to the security parameter $sec$. Let $g, U\in \mathbb G$ be generators. Let $H_2: \mathbb G^2 \to \mathbb Z_q$, $H_3: \mathbb G^3 \to \mathbb Z_q$, and $H_4: \mathbb G^3 \times Z_q \to \mathbb Z_q$ be hash functions that behave as random oracles. Let $\mathsf{KDF}: \mathbb G \to \{0,1\}^\ell$ be a key derivation function also modeled as a random oracle, where $\ell$ is according to the security parameter $sec$. The global public parameters are represented by the tuple:
-$$params = (\mathbb G, g, U, H_2, H_3, H_4, \mathsf{KDF})$$
+\item $\mathsf{Setup}(sec)$: The setup algorithm first determines a cyclic group $\mathbb G$ of prime order $q$, according to the security parameter $sec$. Let $g, U\in \mathbb G$ be generators. Let $\hat H: \mathbb G^2 \to \mathbb Z_q$, $H_3: \mathbb G^3 \to \mathbb Z_q$, and $H_4: \mathbb G^3 \times Z_q \to \mathbb Z_q$ be hash functions that behave as random oracles. Let $\mathsf{KDF}: \mathbb G \to \{0,1\}^\ell$ be a key derivation function also modeled as a random oracle, where $\ell$ is according to the security parameter $sec$. The global public parameters are represented by the tuple:
+$$params = (\mathbb G, g, U, \hat H, H_3, H_4, \mathsf{KDF})$$
 
 \end{itemize}
 
@@ -200,21 +203,21 @@ For simplicity, we will omit the public parameters from the rest of the function
 	\item $\mathsf{ReKeyGen}(sk_A, pk_B, N, m)$: On input the secret key $sk_{A} = a$, the public key of the intended delegatee $pk_{B} = g^b$, a number of fragments $N$, and a threshold $m$, the re-encryption key generation algorithm $\mathsf{ReKeyGen}$ computes $N$ fragments of the re-encryption key between $A$ and $B$ as follows:
 	
 	\begin{enumerate}
-\item Sample random $x_A \in \mathbb Z_q$ and compute $X_A = g^{x_A}$
-\item Compute $ d = H_3(X_A, pk_B, (pk_B)^{x_A})$. Note how $d$ is the result of a non-interactive Diffie-Hellman key exchange between $B$'s keypair and the ephemeral key pair $(x_A, X_A)$. We will use this shared secret to make the re-encryption key generation of the scheme non-interactive.
-\item Sample random $m-1$ elements $f_i\in \mathbb Z_q$, with $1 \leq i \leq m-1$, and  compute $f_0 = a \cdot d^{-1} \bmod q$.
+\item Sample random $e_{ni}, e_x \in \mathbb Z^*_q$ and compute $\P{ni} = g^{e_{ni}}$ and $\P{x} = g^{e_x}$.
+\item Compute $d = \hat H(\P{ni}, pk_B, (pk_B)^{e_{ni}})$. Note how $d$ is the result of a non-interactive Diffie-Hellman key exchange between $B$'s keypair and the ephemeral key pair $(e_{ni},\P{ni})$. We will use this shared secret $d$ to make the re-encryption key generation process non-interactive.
+\item Sample random $m-1$ elements $f_i\in \mathbb Z_q^*$, with $1 \leq i \leq m-1$, and  compute $f_0 = a \cdot d^{-1} \bmod q$.
 \item Construct a polynomial $f(x) \in \mathbb Z_q[x]$ of degree $m-1$, such that $f(x) = f_0 + f_1x + f_2x^2 + ... + f_{m-1}x^{m-1}$.  
-\item Compute $ D = H_6(pk_A, pk_B, pk_B^a)$
-\item Initialize set $KF = \emptyset$ and repeat $N$ times:
+\item Compute $D = \hat H(\P x, pk_B, (pk_B)^{e_x})$
+\item Let $\ell = \lceil\log_2(q)\rceil$. Initialize set $KF = \emptyset$ and repeat $N$ times:
 
     \begin{enumerate}
-    \item Sample random $y, id \in \mathbb Z_q$
-    \item Compute $s_x = H_5(id, D)$ and $Y = g^y$.
-    \item Compute $rk = f(s_x)$ 
+    \item Sample random $y \in \mathbb Z_q^*$ and $id \in \{0,1\}^\ell$.
+    \item Compute $x = \hat H(id, D)$ and $Y = g^y$.
+    \item Compute $rk = f(x)$ 
     \item Compute $U_1 = U^{rk}$.
-    \item Compute $z_1 = H_4(Y, id, pk_A, pk_B, U_1, X_A)$, and $z_2 = y - a \cdot z_1$.
-    \item Define a re-encryption key fragment $kFrag$ as the tuple $(id, rk, X_A, U_1, z_1, z_2)$.
-    \item $KF = KF \cup \{kFrag\}$
+    \item Compute $z_1 = \hat H(Y, id, pk_A, pk_B, U_1, \P{ni}, \P x)$, and $z_2 = y - a \cdot z_1$.
+    \item Define a re-encryption key fragment as: $$kFrag = (id, rk, U_1, \P{ni}, \P x, z_1, z_2)$$
+    \item Set $KF = KF \cup \{kFrag\}$
 	\end{enumerate}
 
 \item Finally, output the set of re-encryption key fragments $KF$.
@@ -226,13 +229,13 @@ For simplicity, we will omit the public parameters from the rest of the function
 
 \begin{itemize}
 	\item $\mathsf{Encapsulate}(pk_A)$: On input the public key $pk_A$, the encapsulation algorithm $\mathsf{Encapsulate}$ first samples random $r, u \in \mathbb Z_q$ and computes $E = g^r$ and $V = g^u$. 
-	Next, it computes the value $s = u + r \cdot H_2(E, V)$. 
+	Next, it computes the value $s = u + r \cdot \hat H(E, V)$. 
 	The derived key is computed as $K = \mathsf{KDF}((pk_A)^{r + u})$. 
 	The tuple $(E, V, s)$ is called $capsule$ and allows to derive again (i.e., ``decapsulate'') the symmetric key $K$. 
 	Finally, the encapsulation algorithm outputs $(K, capsule)$.	
 	
 	\item $\mathsf{CheckCapsule}(capsule)$: On input a $capsule = (E, V, s)$, this algorithm examines the validity of the capsule by checking if the following equation holds:
-	$$ g^s \stackrel{?}{=} V \cdot E^{H_2(E, V)}$$
+	$$ g^s \stackrel{?}{=} V \cdot E^{\hat H(E, V)}$$
 	
 	\item $\mathsf{Decapsulate}(sk_A, capsule)$: On input the secret key $sk_A = a$, and an original $capsule = (E,V,s)$, the decapsulation algorithm $\mathsf{Decapsulate}$ first checks the validity of the capsule with $\mathsf{CheckCapsule}$ and outputs $\perp$ if the check fails. Otherwise, it computes $K = \mathsf{KDF}((E\cdot V)^{a})$. Finally, it outputs $K$.
 	
@@ -241,19 +244,19 @@ For simplicity, we will omit the public parameters from the rest of the function
 \subsubsection{Re-Encapsulation and Fragments Decapsulation}%ryption and Verification of Re-Encryption}
 
 \begin{itemize}
-\item $\mathsf{ReEncapsulate}(kFrag, capsule)$: On input a re-encryption key fragment $kFrag= (id, rk, X_A, U_1, z_1, z_2)$, and a $capsule = (E,V,s)$, the re-encapsulation algorithm $\mathsf{ReEncapsulate}$ first checks the validity of the capsule with $\mathsf{CheckCapsule}$ and outputs $\perp$ if the check fails. Otherwise, it computes $E_1 = E^{rk}$ and $V_1 = V^{rk}$, and outputs the capsule fragment $cFrag = (E_1, V_1, id, X_A)$. 
+\item $\mathsf{ReEncapsulate}(kFrag, capsule)$: On input a re-encryption key fragment $kFrag= (id, rk, U_1, \P{ni}, \P x, z_1, z_2)$, and a $capsule = (E,V,s)$, the re-encapsulation algorithm $\mathsf{ReEncapsulate}$ first checks the validity of the capsule with $\mathsf{CheckCapsule}$ and outputs $\perp$ if the check fails. Otherwise, it computes $E_1 = E^{rk}$ and $V_1 = V^{rk}$, and outputs the capsule fragment $cFrag = (E_1, V_1, id, \P{ni}, \P x)$. 
 
 \item $\mathsf{DecapsulateFrags}(sk_B, pk_A, \{cFrag_i\}_{i=1}^m)$: On input the secret key $sk_B = b$, the original public key $pk_A = g^a$, and a set of $m$ capsule fragments, being each of them $cFrag_i = (E_{1,i}, V_{1,i}, id_i, X_A)$, the fragments decapsulation algorithm $\mathsf{DecapsulateFrag}$ does the following:
 	
 	\begin{enumerate}
-	\item Compute $ D = H_6(pk_A, pk_B, pk_A^b)$
-    \item Let $S = \{s_{x,i}\}_{i=1}^m$, for $s_{x,i} = H_5(id_i, D)$. For all $s_{x,i}\in S$, compute:
-    \[\lambda_{i, S} = \prod\limits_{j=1, j\neq i}^m \frac{s_{x,j}}{s_{x,j}-s_{x,i}}\]
+	\item Compute $ D = \hat H(\P x, pk_B, (\P x)^{b})$
+    \item Let $\mathcal S = \{x_i\}_{i=1}^m$, for $x_i = H_5(id_i, D)$. For all $x_i\in \mathcal S$, compute:
+    \[\lambda_{i, \mathcal S} = \prod\limits_{j=1, j\neq i}^m \frac{x_j}{x_j-x_i}\]
     \item Compute the values:
-     	$$E' = \prod\limits_{i=1}^{m} (E_{1,i})^{\lambda_{i, S}}	
+     	$$E' = \prod\limits_{i=1}^{m} (E_{1,i})^{\lambda_{i, \mathcal S}}	
 		\qquad
-		V' = \prod\limits_{i=1}^{m} (V_{1,i})^{\lambda_{i, S}}$$
-	\item Compute $d = H_3(X_A, pk_B, X_A^b)$. Recall that $d$ is the result of a non-interactive Diffie-Hellman key exchange between $B$'s keypair and the ephemeral key pair $(x_A, X_A)$. Note also that the value $X_A$ is the same for all the $cFrags$ that are produced by re-encryptions using a $kFrag$ in the set of re-encryption key fragments $KF$. 
+		V' = \prod\limits_{i=1}^{m} (V_{1,i})^{\lambda_{i, \mathcal S}}$$
+	\item Compute $d = \hat H(\P{ni}, pk_B, (\P{ni})^b)$. Recall that $d$ is the result of a non-interactive Diffie-Hellman key exchange between $B$'s keypair and the ephemeral key pair $(e_{ni}, \P{ni})$. Note also that the value $\P{ni}$ is the same for all the $cFrags$ that are produced by re-encryptions using a $kFrag$ in the set of re-encryption key fragments $KF$. 
 	\item Finally, output the symmetric key $K= \mathsf{KDF}((E'\cdot V')^{d})$. 
 	\end{enumerate}
 
@@ -288,19 +291,19 @@ Extending Umbral KEM with a DEM results in a full-fledged proxy re-encryption sc
 %\begin{itemize}
 %\item $\mathsf{ProveCorrectness}(kFrag, capsule, cFrag, metadata)$: On input a re-encryption key fragment $kFrag$, a $capsule$, the re-encapsulation algorithm $\mathsf{ReEncapsulation}$ outputs the capsule fragment $cFrag$, or $\perp$ if the the process fails.
 
-To prove correctness of re-encryption, the proxy uses a non-interactive zero-knowledge proof of discrete logarithm equality that shows that both $E_1$ and $V_1$ are exponentiations of, respectively, $E$ and $V$ for the same exponent, and that this exponent is the same used in $U_1$ with respect to $U$. Since $U$ is a public parameter of the system, and $U_1$ is signed by Alice and attached to the proof, then this proofs that $E_1 = E^{rk}$ and $V_1 = V^{rk}$, given that $U_1 = U^{rk}$. In other words, let $dlog_B(X)$ be the discrete logarithm of $X \in \G$ with respect to element $B \in G$; the re-encryption correctness proof shows that $dlog_E(E_1) = dlog_V(V_1) = dlog_U(U_1)$. 
+To prove correctness of re-encryption, the proxy uses a non-interactive zero-knowledge proof of discrete logarithm equality that shows that both $E_1$ and $V_1$ are exponentiations of, respectively, $E$ and $V$ for the same exponent, and that this exponent is the same used in $U_1$ with respect to $U$. Since $U$ is a public parameter of the system, and $U_1$ is signed by Alice and attached to the proof, then this proofs that $E_1 = E^{rk}$ and $V_1 = V^{rk}$, given that $U_1 = U^{rk}$. In other words, let $dlog_B(X)$ be the discrete logarithm of $X \in \G$ with respect to element $B \in \G$; the re-encryption correctness proof shows that $dlog_E(E_1) = dlog_V(V_1) = dlog_U(U_1)$. 
 
 \subsection{Producing proofs of re-encryption correctness}
 
 This extends the $\mathsf{ReEncapsulate}$ algorithm to include a proof of correctness in the resulting $cFrag$. We also support the addition of an optional arbitrary input $aux$ to be added to the proof, and which can be used as metadata for the re-encryption request (e.g., in the NuCypher KMS this would include the proxy identifier, a timestamp, etc.). 
 
-Let the re-encryption key fragment be $kFrag= (id, rk, X_A, U_1, z_1, z_2)$, and the input $capsule = (E,V,s)$. The resulting capsule fragment is $cFrag = (E_1, V_1, id, X_A)$. 
+Let the re-encryption key fragment be $kFrag= (id, rk, U_1, \P{ni}, \P x, z_1, z_2)$, and the input $capsule = (E,V,s)$. The resulting capsule fragment is $cFrag = (E_1, V_1, id, \P{ni}, \P x)$. 
 A correctness proof $\pi$ for $cFrag$ is generated as follows:
  \begin{enumerate}
-    \item Sample random $\tau \in \mathbb Z_q$
+    \item Sample random $\tau \in \mathbb Z_q^*$
     \item Compute the values:
      	$\qquad E_2 = E^{\tau}	\qquad	V_2 = V^\tau	\qquad	U_2 = U^\tau$
-	\item Compute the hash value $h = H(E, E_1, E_2, V, V_1, V_2, U, U_1, U_2, aux)$
+	\item Compute the hash value $h = \hat H(E, E_1, E_2, V, V_1, V_2, U, U_1, U_2, aux)$
 	\item Compute $\rho = \tau + h\cdot rk$
 	\item Output the proof $\pi = (E_2, V_2, U_2, U_1, z_1, z_2, \rho, aux)$
  \end{enumerate}
@@ -311,10 +314,11 @@ The result of the extended $\mathsf{ReEncapsulate}$ algorithm with correctness g
 
 This extends the $\mathsf{DecapsulateFrags}$ algorithm to check the attached proof for each $cFrag$. 
 
-Let the input $capsule$ be the tuple $(E,V,s)$. For each $cFrag = (E_1, V_1, id, X_A)$ and proof $\pi = (E_2, V_2, U_2, U_1, z_1, z_2, \rho, aux)$:
+Let the input $capsule$ be the tuple $(E,V,s)$. For each $cFrag = (E_1, V_1, id, \P{ni}, \P x)$ and proof $\pi = (E_2, V_2, U_2, U_1, z_1, z_2, \rho, aux)$:
  \begin{enumerate}
-    \item Check that the kFrag signature $(z_1, z_2)$ is correct. 
-    \item Compute the hash value $h = H(E, E_1, E_2, V, V_1, V_2, U, U_1, U_2, aux)$
+    \item Check that the signature $(z_1, z_2)$ of $kFrag$ is correct:
+    $$ z_1 \stackrel{?}{=} \hat H (g^{z_2}\cdot(pk_A)^{z_1}, id, pk_A, pk_B, U_1, \P{ni}, \P x)$$
+    \item Compute the hash value $h = \hat H(E, E_1, E_2, V, V_1, V_2, U, U_1, U_2, aux)$
     \item Check that the following equations hold:
     \begin{align*} 
 E^{\rho} &\stackrel{?}{=} E_2 \cdot E_1^h \\ 
@@ -333,7 +337,7 @@ U^{\rho} &\stackrel{?}{=} U_2 \cdot U_1^h
 The only restriction that the Umbral cryptosystem imposes on the choice of EC curve is that it should generate a group of prime order, since we need to compute inverses modulo the order of this group. In our current setting, we use the \textsf{secp256k1} curve since it fulfills this latter requirement and it is widely used in the blockchain ecosystem; we are exploring other curve choices that could improve performance. 
 
 \subsection{Hash functions}
-As described in Section~\ref{sec:setup_umbral}, Umbral requires several hash functions, such as $H_2: \mathbb G^2 \to \mathbb Z_q$, $H_3: \mathbb G^3 \to \mathbb Z_q$, and $H_4: \mathbb G^3 \times Z_q \to \mathbb Z_q$, which behave as random oracles that output an element of $\mathbb Z_q$. Since for elements of both $\mathbb G$ and $\mathbb Z_q$ there exists efficient encodings to bit string (e.g., compressed representation in the case EC points), in \textsf{pyUmbral} we implement these hash functions from a common hash function $H': \{0,1\}^* \to \mathbb Z_q$. For example, for the case of $H_2$, we can define it as $H_2(g_1, g_2) = H'(\mathsf{encode}(g_1)||\mathsf{encode}(g_2))$.
+As described in Section~\ref{sec:setup_umbral}, Umbral requires several hash functions, such as $\hat H: \mathbb G^2 \to \mathbb Z_q$, $H_3: \mathbb G^3 \to \mathbb Z_q$, and $H_4: \mathbb G^3 \times Z_q \to \mathbb Z_q$, which behave as random oracles that output an element of $\mathbb Z_q$. Since for elements of both $\mathbb G$ and $\mathbb Z_q$ there exists efficient encodings to bit string (e.g., compressed representation in the case EC points), in \textsf{pyUmbral} we implement these hash functions from a common hash function $H': \{0,1\}^* \to \mathbb Z_q$. For example, for the case of $\hat H$, we can define it as $\hat H(g_1, g_2) = H'(\mathsf{encode}(g_1)||\mathsf{encode}(g_2))$.
 
 This reduces the problem to the definition of $H'$. Let $n$ be the order of the group induced by the curve in use, $X$ a byte string of arbitrary size, and $\mathsf{digest}$ a cryptographic hash function with a digest size $> 64 + \log_2(n)$  (e.g., for a 256-bit curve, we use \textsf{BLAKE2b} with a digest size of 512 bits). The output $h_X$ of $H'(X)$ is computed as:
 $$h_X \Leftarrow 1 + \mathsf{int}(\mathsf{digest}(X)) \bmod (n-1)$$
