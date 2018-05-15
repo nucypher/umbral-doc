@@ -334,7 +334,30 @@ U^{\rho} &\stackrel{?}{=} U_2 \cdot U_1^h
 \section{Notes concerning Umbral reference implementation (\textsf{pyUmbral})}
 
 \subsection{Choice of elliptic curve}
-The only restriction that the Umbral cryptosystem imposes on the choice of EC curve is that it should generate a group of prime order, since we need to compute inverses modulo the order of this group. In our current setting, we use the \textsf{secp256k1} curve since it fulfills this latter requirement and it is widely used in the blockchain ecosystem; we are exploring other curve choices that could improve performance. 
+The only restriction that the Umbral cryptosystem imposes on the choice of EC curve is that it should generate a group of prime order, since we need to compute inverses modulo the order of this group. In our current setting, we use the \textsf{secp256k1} curve as the default since it fulfills this latter requirement and it is widely used in the blockchain ecosystem; we are exploring other curve choices that could improve performance or offer other trade-offs. 
+
+\subsection{Public parameters}
+
+Once the curve is fixed to \textsf{secp256k1}, we can define other parameters for Umbral. In particular, Umbral requires two generators, $g$ and $U$. For $g$, we use the default generator provided by the SEC standard, which is describe as follows, in compressed and uncompressed notation:
+%
+\begin{align*} 
+g_{\text{compr}} &= &\mathtt{02\ 79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798}\\
+g_{\text{uncompr}} &= &\mathtt{04\ 79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798}\\
+ & &\mathtt{\ \ \ 483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8}\\
+\end{align*}
+
+For the second generator, we derive it using a hash function so that $U = H(seed_U)$, where $seed_U$ is defined as follows:
+$$seed_U = g_{\text{compr}}||\mathtt{``NuCypher/UmbralParameters/u''}$$
+
+This produces the following values:
+%
+\begin{align*} 
+seed_U &= &\mathtt{02\ 79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798}\\
+ 	  & &\mathtt{\ \ \ 4e754379706865722f556d6272616c506172616d65746572732f75\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ }\\
+U &= &\mathtt{04\ 8ab2b3b64a4626125afc62d5a8930842e93ae278968d99d63739b20db0843abe}\\
+ & &\mathtt{\ \ \ 0ccdaf6aaebfa75fa02f8594d49475653304682efc1b9f6c7222c5e5814e37e6}\\
+\end{align*}
+
 
 \subsection{Hash functions}
 As described in Section~\ref{sec:setup_umbral}, Umbral requires several hash functions, such as $\hat H: \mathbb G^2 \to \mathbb Z_q$, $H_3: \mathbb G^3 \to \mathbb Z_q$, and $H_4: \mathbb G^3 \times Z_q \to \mathbb Z_q$, which behave as random oracles that output an element of $\mathbb Z_q$. Since for elements of both $\mathbb G$ and $\mathbb Z_q$ there exists efficient encodings to bit string (e.g., compressed representation in the case EC points), in \textsf{pyUmbral} we implement these hash functions from a common hash function $H': \{0,1\}^* \to \mathbb Z_q$. For example, for the case of $\hat H$, we can define it as $\hat H(g_1, g_2) = H'(\mathsf{encode}(g_1)||\mathsf{encode}(g_2))$.
